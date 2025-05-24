@@ -1,76 +1,92 @@
 from unittest import TestCase
 import numpy as np
+import pandas as pd
 
 def func(x: float):
-    return x * 2.3 - 0.23
+    return 2.0 * x + 3.2
 
 
 class TestMappingRange(TestCase):
     def test_CostFunction(self):
-        # x = np.arange(0, 100, 0.1)
-        # y = x * 2.3 - 0.23
-
-        yA = func(0)
-        yB = func(100)
-        yC = func(50)
 
         gap_len = 0.01
-        max_SF = max(yA, yB, yC)
+        interval_squezze = 0.8
+        X = list()
+        Y = list()
 
-        intervals = [(12.3, 48.9),
-                     (89.3, 96.4)]
+        X.append(0)
+        Y.append(func(0))
 
-        weights = []
-        for item in intervals:
+        X.append(50)
+        Y.append(func(50))
 
+        X.append(100)
+        Y.append(func(100))
 
-        # # Slice 1
-        # x1 = 34.3
-        # x2 = 67.8
-        # y1 = func(x1)
-        # y2 = func(x2)
-        #
-        # # Slice 2:
-        # x3 = 89.3
-        # x4 = 96.3
-        # y3 = func(x3)
-        # y4 = func(x4)
-        #
-        # # Costs:
-        # cost1 = 2 * max_SF - y1 - y2
-        # cost2 = 2 * max_SF - y3 - y4
-        #
-        # sum_Cost = cost1 + cost2
+        func_MAX = max(Y)
+        func_MIN = min(Y)
 
+        # Selecting intervals
+        # interval item : (tuple) -> cost : float
+        intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
+        sum_cost = 0
+        for i in range(len(X) - 1):
+            dx = X[i + 1] - X[i]
+            mid_point = (X[i + 1] + X[i]) / 2
+            x0 = mid_point - dx * 0.8 / 2
+            x1 = mid_point + dx * 0.8 / 2
 
-        # w1 = cost1 / sum_Cost
-        # w2 = cost2 / sum_Cost
+            # TODO: сделать параметром eps (0.0001) -
+            #  точность, при которой в наших масштабах
+            #  мы считаем значения равными везде в оптимайзере?
+            if func_MAX - func_MIN <= 0.00001:
+                y1_cost = 1.0
+                y2_cost = 1.0
+            else:
+                y1_cost = (Y[i + 1] - func_MIN) / (func_MAX - func_MIN) + 0.1
+                y2_cost = (Y[i + 1] - func_MIN) / (func_MAX - func_MIN) + 0.1
+            sum_cost += y1_cost + y2_cost
 
-        weights = list(reversed(sorted([w1, w2])))
-        S_renorm = sum(weights) + (2 - 1) * gap_len
-
-        for i in range(len(weights)):
-            weights[i] = weights[i] / S_renorm
-
-        print(f"w1 = {w1}, w2 = {w2}")
-
-        # Placing on unit-len:
-        u_coords = []
-        cursor = 0
-        for w in weights:
-            u_coords.append((cursor, cursor + w))
-            cursor += w + gap_len
-
-        # Unmapping picked values
-        picked_value = 0.634
-
-        index = 0
-        for i, u_pair in enumerate(u_coords):
-            if u_pair[0] <= picked_value <= u_pair[1]:
-                index = i
-                break
+            intervals = intervals._append({
+                "x0": x0,
+                "x1": x1,
+                "cost": y1_cost + y2_cost
+            }, ignore_index=True)
 
         pass
+
+        # TODO: плато детектор - тоже через eps?
+
+
+        # renormalize weights
+        intervals["cost"] = intervals["cost"] / sum_cost
+
+        assert abs(intervals["cost"].sum() - 1.0) <= 0.00001        # не eps!
+
+        intervals = intervals.sort_values(by="cost", ascending=False)
+
+        # # Placing on unit-len:
+        u_coords = []
+        u_cursor = 0.0
+        u_gap = 0.01
+        for row in intervals.iterrows():
+            item = row[1]
+            w = item["cost"]
+            u_coords.append((u_cursor, u_cursor + w))
+            u_cursor += w + u_gap
+            pass
+
+
+        # # Unmapping picked values
+        # picked_value = 0.634
+        #
+        # index = 0
+        # for i, u_pair in enumerate(u_coords):
+        #     if u_pair[0] <= picked_value <= u_pair[1]:
+        #         index = i
+        #         break
+        #
+        # pass
 
 
 
