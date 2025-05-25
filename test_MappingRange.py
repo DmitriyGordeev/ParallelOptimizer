@@ -74,19 +74,22 @@ class TestMappingRange(TestCase):
             w = item["cost"]
             u_coords.append((u_cursor, u_cursor + w))
             u_cursor += w + u_gap
-            pass
+        pass
 
 
-        # # Unmapping picked values
-        # picked_value = 0.634
-        #
-        # index = 0
-        # for i, u_pair in enumerate(u_coords):
-        #     if u_pair[0] <= picked_value <= u_pair[1]:
-        #         index = i
-        #         break
-        #
-        # pass
+        # Unmapping picked values
+        # TODO: если попал в u_gap
+        picked_value = 0.78
+        X_unmapped = 0.0
+        for i, u_pair in enumerate(u_coords):
+            if u_pair[0] <= picked_value <= u_pair[1]:
+                alpha = (picked_value - u_pair[0]) / (u_pair[1] - u_pair[0])
+                x0 = intervals.iloc[i]["x0"]
+                x1 = intervals.iloc[i]["x1"]
+                X_unmapped = x0 + (x1 - x0) * alpha
+                break
+
+
 
 
 
