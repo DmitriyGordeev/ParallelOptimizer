@@ -3,12 +3,14 @@ import pandas as pd
 
 
 class CustomOptimizer:
-    def __init__(self):
+    def __init__(self, objective: callable):
         self.known_values = pd.DataFrame(columns=["X", "Y"])    # TODO: нужно чтобы были отсортированы по Y
                                                                 #   - чтобы брать max = row[0], min = row[-1] ?
         self.squeeze_factor = 0.8
         self.intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
         self.u_coords = []
+        self.n_probes = 4
+        self.objective = objective
 
 
     def SelectIntervals(self):
@@ -19,8 +21,11 @@ class CustomOptimizer:
         self.intervals = self.intervals.drop(self.intervals.index)
 
         sum_cost = 0
+
+        # Assuming known_values is sorted by X (increasing order)
         X = self.known_values["X"].to_numpy()
         Y = self.known_values["Y"].to_numpy()
+
         for i in range(self.known_values.shape[0] - 1):
             dx = X[i + 1] - X[i]
             mid_point = (X[i + 1] + X[i]) / 2
@@ -84,8 +89,32 @@ class CustomOptimizer:
 
             else:
                 u_potential_gap_hit = True
-
         return X_unmapped
+
+
+    def CreateProbePoints(self) -> list:
+        num_probes = min(self.n_probes, len(self.u_coords))
+        assert num_probes > 0
+
+        u_step = 1.01 / (num_probes + 1)
+        out = [0.0] * num_probes
+        u_pick = u_step
+        for i in range(num_probes):
+            out[i] = self.UnmapValue(u_pick)
+            u_pick += u_step
+        return out
+
+
+    def RunValues(self, values: list):
+        assert len(values) > 0
+        for x in values:
+            y = self.objective(x)
+            self.known_values = self.known_values._append({
+                "X": x,
+                "Y": y
+            }, ignore_index=True)
+        self.known_values = self.known_values.sort_values(by="X")
+
 
 
     def RunCycle(self):
