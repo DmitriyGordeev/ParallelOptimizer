@@ -10,12 +10,17 @@ class CustomOptimizer:
         self.intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
         self.u_coords = []
         self.n_probes = 4
+        self.max_intervals = 10
         self.objective = objective
+        self.itr = 0
 
 
     def SelectIntervals(self):
         min_y = self.known_values["Y"].min()
         max_y = self.known_values["Y"].max()
+
+        # TODO: добавить параметр - максимальное количество областей,
+        #  которые можем просматривать (из которых можем собирать u_coords) ?
 
         # cleanup values from previous run
         self.intervals = self.intervals.drop(self.intervals.index)
@@ -26,9 +31,13 @@ class CustomOptimizer:
         X = self.known_values["X"].to_numpy()
         Y = self.known_values["Y"].to_numpy()
 
-        for i in range(self.known_values.shape[0] - 1):
-            dx = X[i + 1] - X[i]
-            mid_point = (X[i + 1] + X[i]) / 2
+        areas = self.CreateIntervalSet()
+        for pair in areas:
+            iL = pair[0]
+            iR = pair[1]
+
+            dx = X[iR] - X[iL]
+            mid_point = (X[iR] + X[iL]) / 2
             x0 = mid_point - dx * self.squeeze_factor / 2
             x1 = mid_point + dx * self.squeeze_factor / 2
 
@@ -39,8 +48,8 @@ class CustomOptimizer:
                 y1_cost = 1.0
                 y2_cost = 1.0
             else:
-                y1_cost = (Y[i + 1] - min_y) / (max_y - min_y) + 0.1
-                y2_cost = (Y[i + 1] - min_y) / (max_y - min_y) + 0.1
+                y1_cost = (Y[iL] - min_y) / (max_y - min_y) + 0.1
+                y2_cost = (Y[iR] - min_y) / (max_y - min_y) + 0.1
             sum_cost += y1_cost + y2_cost
 
             self.intervals = self.intervals._append({
@@ -54,6 +63,28 @@ class CustomOptimizer:
         assert abs(self.intervals["cost"].sum() - 1.0) <= 0.00001  # не eps!
         self.intervals = self.intervals.sort_values(by="cost", ascending=False)
 
+
+
+    def CreateIntervalSet(self):
+        Y_sort = self.known_values.sort_values(by="Y", ascending=False)
+        area_indexes = set()
+
+        for row in Y_sort.iterrows():
+            index = int(row[0])
+            l_index = index - 1
+            r_index = index + 1
+            if l_index >= 0:
+                area_indexes.add((l_index, index))
+
+            if len(area_indexes) == self.max_intervals:
+                break
+
+            if r_index < Y_sort.shape[0]:
+                area_indexes.add((index, r_index))
+
+            if len(area_indexes) == self.max_intervals:
+                break
+        return area_indexes
 
 
 
@@ -96,7 +127,8 @@ class CustomOptimizer:
         num_probes = min(self.n_probes, len(self.u_coords))
         assert num_probes > 0
 
-        u_step = 1.01 / (num_probes + 1)
+        u_len = self.u_coords[-1][1]
+        u_step = u_len / (num_probes + 1)
         out = [0.0] * num_probes
         u_pick = u_step
         for i in range(num_probes):
@@ -114,8 +146,27 @@ class CustomOptimizer:
                 "Y": y
             }, ignore_index=True)
         self.known_values = self.known_values.sort_values(by="X")
+        self.known_values.reset_index(inplace=True, drop=True)
+        pass
+
+
+
+    def Warmup(self):
+        # TODO
+        pass
 
 
 
     def RunCycle(self):
-        pass
+        for i in range(10):
+            if self.itr == 0:
+                self.Warmup()
+            else:
+                self.SelectIntervals()
+                self.UnitMapping()
+                new_X = self.CreateProbePoints()
+                self.RunValues(new_X)
+
+            self.itr += 1
+
+
