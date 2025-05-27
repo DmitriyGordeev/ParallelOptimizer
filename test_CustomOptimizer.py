@@ -3,6 +3,8 @@ from CustomOptimizer import CustomOptimizer
 import pandas as pd
 import numpy as np
 
+import matplotlib.pyplot as plot
+
 
 def func(x: float):
     return (x - 50) * (x - 50)
@@ -12,9 +14,9 @@ class TestCustomOptimizer(TestCase):
     def test_general(self):
         opt = CustomOptimizer(objective=func)
 
-        opt.known_values = opt.known_values._append({"X": 0, "Y": func(0)}, ignore_index=True)
-        opt.known_values = opt.known_values._append({"X": 50, "Y": func(50)}, ignore_index=True)
-        opt.known_values = opt.known_values._append({"X": 100, "Y": func(100)}, ignore_index=True)
+        # opt.known_values = opt.known_values._append({"X": 0, "Y": func(0)}, ignore_index=True)
+        # opt.known_values = opt.known_values._append({"X": 50, "Y": func(50)}, ignore_index=True)
+        # opt.known_values = opt.known_values._append({"X": 100, "Y": func(100)}, ignore_index=True)
 
         # # Iteration 1
         # opt.SelectIntervals()
@@ -28,7 +30,13 @@ class TestCustomOptimizer(TestCase):
         # new_values = opt.CreateProbePoints()
         # opt.RunValues(new_values)
 
-        opt.RunCycle()
+        opt.RunCycle(names=["X"], mins=[0], maxs=[100])
+
+        print(f"internal interations = {opt.internal_itr}")
+
+        plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
+        plot.grid()
+        plot.show()
 
         pass
 

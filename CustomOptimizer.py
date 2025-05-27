@@ -12,7 +12,12 @@ class CustomOptimizer:
         self.n_probes = 4
         self.max_intervals = 10
         self.objective = objective
-        self.itr = 0
+        self.epochs = 0
+        self.internal_itr = 0
+
+        self.names = []
+        self.mins = []
+        self.maxs = []
 
 
     def SelectIntervals(self):
@@ -141,6 +146,7 @@ class CustomOptimizer:
         assert len(values) > 0
         for x in values:
             y = self.objective(x)
+            self.internal_itr += 1
             self.known_values = self.known_values._append({
                 "X": x,
                 "Y": y
@@ -152,14 +158,41 @@ class CustomOptimizer:
 
 
     def Warmup(self):
-        # TODO
-        pass
+        # TODO: обобщить на вектор параметров:
+
+        y = self.objective(self.mins[0])
+        self.known_values = self.known_values._append({
+            "X": self.mins[0],
+            "Y": y
+        }, ignore_index=True)
+
+        y = self.objective(self.maxs[0])
+        self.known_values = self.known_values._append({
+            "X": self.maxs[0],
+            "Y": y
+        }, ignore_index=True)
+
+        middle = (self.mins[0] + self.maxs[0]) / 2.0
+        y = self.objective(middle)
+        self.known_values = self.known_values._append({
+            "X": middle,
+            "Y": y
+        }, ignore_index=True)
+
+        self.internal_itr += 3
+        self.known_values = self.known_values.sort_values(by="X")
+        self.known_values.reset_index(inplace=True, drop=True)
 
 
 
-    def RunCycle(self):
-        for i in range(10):
-            if self.itr == 0:
+    def RunCycle(self, names: list, mins: list, maxs: list):
+        assert len(names) == len(mins) == len(maxs) != 0
+        self.names = names
+        self.mins = mins
+        self.maxs = maxs
+
+        for i in range(1):
+            if self.epochs == 0:
                 self.Warmup()
             else:
                 self.SelectIntervals()
@@ -167,6 +200,6 @@ class CustomOptimizer:
                 new_X = self.CreateProbePoints()
                 self.RunValues(new_X)
 
-            self.itr += 1
+            self.epochs += 1
 
 
