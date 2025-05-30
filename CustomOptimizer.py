@@ -7,7 +7,7 @@ import pandas as pd
 class CustomOptimizer:
     def __init__(self, objective: callable):
         self.known_values = pd.DataFrame(columns=["X", "Y", "blocked"])
-        self.squeeze_factor = 0.3
+        self.squeeze_factor = 0.9
         self.intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
         self.u_coords = []
         self.n_probes = 5
@@ -74,7 +74,7 @@ class CustomOptimizer:
         # rescale weights
         self.intervals["cost"] = self.intervals["cost"] / sum_cost
         assert abs(self.intervals["cost"].sum() - 1.0) <= 0.00001  # не eps!
-        # self.intervals = self.intervals.sample(frac=1)
+        self.intervals = self.intervals.sample(frac=1)
         self.intervals = self.intervals.sort_values(by="cost", ascending=False, kind='stable')
         return True
 
@@ -160,7 +160,8 @@ class CustomOptimizer:
 
 
     def CreateProbePoints(self) -> list:
-        num_probes = min(self.n_probes, len(self.u_coords))
+        # num_probes = min(self.n_probes, len(self.u_coords))
+        num_probes = self.n_probes
         assert num_probes > 0
 
         u_len = self.u_coords[-1][1]
