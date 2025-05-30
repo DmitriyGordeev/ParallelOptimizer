@@ -7,12 +7,13 @@ import matplotlib.pyplot as plot
 
 
 def func(x: float):
-    return (x - 50) * (x - 50)
-    # return 0.0
+    # return (x - 50) * (x - 50)
+    return 0.0
 
 class TestCustomOptimizer(TestCase):
     def test_general(self):
         opt = CustomOptimizer(objective=func)
+        opt.n_probes = 5
 
         # opt.known_values = opt.known_values._append({"X": 0, "Y": func(0)}, ignore_index=True)
         # opt.known_values = opt.known_values._append({"X": 50, "Y": func(50)}, ignore_index=True)
@@ -30,10 +31,7 @@ class TestCustomOptimizer(TestCase):
         # new_values = opt.CreateProbePoints()
         # opt.RunValues(new_values)
 
-        opt.RunCycle(names=["X"], mins=[0], maxs=[100])
-
-        print(f"internal interations = {opt.internal_itr}")
-
+        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=20)
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
         plot.show()

@@ -1,15 +1,16 @@
+import enum
+
 import numpy as np
 import pandas as pd
 
 
 class CustomOptimizer:
     def __init__(self, objective: callable):
-        self.known_values = pd.DataFrame(columns=["X", "Y"])    # TODO: нужно чтобы были отсортированы по Y
-                                                                #   - чтобы брать max = row[0], min = row[-1] ?
-        self.squeeze_factor = 0.8
+        self.known_values = pd.DataFrame(columns=["X", "Y", "blocked"])
+        self.squeeze_factor = 0.3
         self.intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
         self.u_coords = []
-        self.n_probes = 4
+        self.n_probes = 5
         self.max_intervals = 10
         self.objective = objective
         self.epochs = 0
@@ -19,8 +20,12 @@ class CustomOptimizer:
         self.mins = []
         self.maxs = []
 
+        self.eps = 0.001
+        self.min_interval_size_ratio = 0.01
 
-    def SelectIntervals(self):
+
+
+    def SelectIntervals(self) -> bool:
         min_y = self.known_values["Y"].min()
         max_y = self.known_values["Y"].max()
 
@@ -37,6 +42,9 @@ class CustomOptimizer:
         Y = self.known_values["Y"].to_numpy()
 
         areas = self.CreateIntervalSet()
+        if len(areas) == 0:
+            return False
+
         for pair in areas:
             iL = pair[0]
             iR = pair[1]
@@ -66,29 +74,52 @@ class CustomOptimizer:
         # rescale weights
         self.intervals["cost"] = self.intervals["cost"] / sum_cost
         assert abs(self.intervals["cost"].sum() - 1.0) <= 0.00001  # не eps!
-        self.intervals = self.intervals.sort_values(by="cost", ascending=False)
-
+        # self.intervals = self.intervals.sample(frac=1)
+        self.intervals = self.intervals.sort_values(by="cost", ascending=False, kind='stable')
+        return True
 
 
     def CreateIntervalSet(self):
-        Y_sort = self.known_values.sort_values(by="Y", ascending=False)
+        Y_sort = self.known_values.sample(frac=1)
+        Y_sort = Y_sort.sort_values(by="Y", ascending=False, kind='stable')
+
+        # select only from non-blocked intervals
+        Y_sort = Y_sort[Y_sort["blocked"] == False]
         area_indexes = set()
+        minmax_delta = (self.mins[0] - self.maxs[0])
 
         for row in Y_sort.iterrows():
             index = int(row[0])
             l_index = index - 1
             r_index = index + 1
-            if l_index >= 0:
+
+            if l_index < 0 or r_index >= Y_sort.shape[0]:
+                continue
+
+            # Mark small interval (l_index, index) as blocked and skip its consideration
+            xL = self.known_values.iloc[l_index]["X"]
+            xR = self.known_values.iloc[index]["X"]
+            dx = xR - xL
+            if abs(dx / minmax_delta) <= self.min_interval_size_ratio:
+                # self.known_values.iloc[l_index]["blocked"] = True
+                self.known_values.at[l_index, 'blocked'] = True
+            else:
                 area_indexes.add((l_index, index))
+                if len(area_indexes) == self.max_intervals:
+                    break
 
-            if len(area_indexes) == self.max_intervals:
-                break
-
-            if r_index < Y_sort.shape[0]:
+            # Mark small interval (index, r_index) as blocked and skip its consideration
+            xL = self.known_values.iloc[index]["X"]
+            xR = self.known_values.iloc[r_index]["X"]
+            dx = xR - xL
+            if abs(dx / minmax_delta) <= self.min_interval_size_ratio:
+                # self.known_values.iloc[index]["blocked"] = True
+                self.known_values.at[index, 'blocked'] = True
+            else:
                 area_indexes.add((index, r_index))
+                if len(area_indexes) == self.max_intervals:
+                    break
 
-            if len(area_indexes) == self.max_intervals:
-                break
         return area_indexes
 
 
@@ -149,7 +180,8 @@ class CustomOptimizer:
             self.internal_itr += 1
             self.known_values = self.known_values._append({
                 "X": x,
-                "Y": y
+                "Y": y,
+                "blocked": False
             }, ignore_index=True)
         self.known_values = self.known_values.sort_values(by="X")
         self.known_values.reset_index(inplace=True, drop=True)
@@ -163,43 +195,53 @@ class CustomOptimizer:
         y = self.objective(self.mins[0])
         self.known_values = self.known_values._append({
             "X": self.mins[0],
-            "Y": y
+            "Y": y,
+            "blocked": False
         }, ignore_index=True)
 
         y = self.objective(self.maxs[0])
         self.known_values = self.known_values._append({
             "X": self.maxs[0],
-            "Y": y
+            "Y": y,
+            "blocked": False
         }, ignore_index=True)
 
         middle = (self.mins[0] + self.maxs[0]) / 2.0
         y = self.objective(middle)
         self.known_values = self.known_values._append({
             "X": middle,
-            "Y": y
+            "Y": y,
+            "blocked": False
         }, ignore_index=True)
 
+        # TODO: засунуть в функцию к self.objective(...) и вызывать вместе
         self.internal_itr += 3
         self.known_values = self.known_values.sort_values(by="X")
         self.known_values.reset_index(inplace=True, drop=True)
 
 
 
-    def RunCycle(self, names: list, mins: list, maxs: list):
+    def RunCycle(self, names: list, mins: list, maxs: list, max_epochs: int):
         assert len(names) == len(mins) == len(maxs) != 0
         self.names = names
         self.mins = mins
         self.maxs = maxs
 
-        for i in range(1):
+        for i in range(max_epochs):
             if self.epochs == 0:
                 self.Warmup()
             else:
-                self.SelectIntervals()
+                if not self.SelectIntervals():
+                    print(f"Stop iterations, no areas left to divide further")
+                    break
                 self.UnitMapping()
                 new_X = self.CreateProbePoints()
                 self.RunValues(new_X)
+                print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
             self.epochs += 1
 
-
+        self.known_values.sort_values(by="Y", ascending=False, inplace=True)
+        print(f"epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
+              f"top values:\n")
+        print(self.known_values.head(5))

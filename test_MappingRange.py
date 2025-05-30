@@ -104,11 +104,11 @@ class TestMappingRange(TestCase):
 
 
     def test_Drop(self):
-
-        df = pd.DataFrame(columns=["A", "B"])
-        df["A"] = [0, 1, 2]
-        df["B"] = [9, 8, 4]
-        df = df.drop(df.index)
+        df = pd.DataFrame(columns=["Cost", "Value"])
+        df["Cost"] = [1, 2, 1, 3, 1, 2]
+        df["Value"] = [17, 4, 5, 7, 4, 21]
+        df = df.sample(frac=1)
+        df = df.sort_values(by="Cost", kind="stable")
         pass
 
 
