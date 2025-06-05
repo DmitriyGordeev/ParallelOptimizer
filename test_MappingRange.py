@@ -113,4 +113,31 @@ class TestMappingRange(TestCase):
 
 
 
+    def test_table_reindex(self):
+        data = pd.DataFrame(columns=["X", "Y", "plato_block"])
+        data["X"] = np.arange(0, 10) * 0.1
+        data["Y"] = 2 * np.arange(0, 10) * 0.1 + 0.98
+        data["plato_block"] = [False, False, True, False, False, False, True, True, False, False]
+
+        non_blocked = data[data["plato_block"] == False]
+        non_blocked["original_index"] = non_blocked.index
+        non_blocked.reset_index(inplace=True, drop=True)
+
+        tables = [non_blocked]
+
+        table_dict = dict()
+        table_dict[0] = (0.0, 0.26)
+
+        u_pick = 0.17
+        for k, v in table_dict.items():
+            if v[0] <= u_pick <= v[1]:
+                lerp_coeff = (u_pick - v[0]) / (v[1] - v[0])
+                tgt_table = tables[k]
+                idx_range = tgt_table.index
+                row_index = int((idx_range.stop - idx_range.start) * lerp_coeff)
+                unmapped_index = tgt_table.iloc[row_index]["original_index"]
+                print(f"unmapped_index = {unmapped_index} => X = {data.iloc[unmapped_index]["X"]}")
+                break
+
+
 

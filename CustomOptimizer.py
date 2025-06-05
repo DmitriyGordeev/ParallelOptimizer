@@ -7,11 +7,13 @@ import pandas as pd
 class CustomOptimizer:
     def __init__(self, objective: callable):
         self.known_values = pd.DataFrame(columns=["X", "Y", "blocked"])
-        self.squeeze_factor = 0.9
+        self.squeeze_factor = 0.8
         self.intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
         self.u_coords = []
         self.n_probes = 5
-        self.max_intervals = 10
+        self.forward_intervals = 7
+        self.backward_intervals = 3
+        self.backward_fires_each_n = 5
         self.objective = objective
         self.epochs = 0
         self.internal_itr = 0
@@ -25,12 +27,9 @@ class CustomOptimizer:
 
 
 
-    def SelectIntervals(self) -> bool:
+    def SelectIntervals(self, forward=True) -> bool:
         min_y = self.known_values["Y"].min()
         max_y = self.known_values["Y"].max()
-
-        # TODO: добавить параметр - максимальное количество областей,
-        #  которые можем просматривать (из которых можем собирать u_coords) ?
 
         # cleanup values from previous run
         self.intervals = self.intervals.drop(self.intervals.index)
@@ -41,7 +40,11 @@ class CustomOptimizer:
         X = self.known_values["X"].to_numpy()
         Y = self.known_values["Y"].to_numpy()
 
-        areas = self.CreateIntervalSet()
+        if forward:
+            areas = self.CreateIntervalSet()
+        else:
+            areas = self.CreateBackwardIntervalSet()
+
         if len(areas) == 0:
             return False
 
@@ -75,7 +78,11 @@ class CustomOptimizer:
         self.intervals["cost"] = self.intervals["cost"] / sum_cost
         assert abs(self.intervals["cost"].sum() - 1.0) <= 0.00001  # не eps!
         self.intervals = self.intervals.sample(frac=1)
-        self.intervals = self.intervals.sort_values(by="cost", ascending=False, kind='stable')
+
+        sort_order_ascending = True
+        if forward:
+            sort_order_ascending = False
+        self.intervals = self.intervals.sort_values(by="cost", ascending=sort_order_ascending, kind='stable')
         return True
 
 
@@ -86,7 +93,7 @@ class CustomOptimizer:
         # select only from non-blocked intervals
         Y_sort = Y_sort[Y_sort["blocked"] == False]
         area_indexes = set()
-        minmax_delta = (self.mins[0] - self.maxs[0])
+        minmax_delta = (self.maxs[0] - self.mins[0])
 
         for row in Y_sort.iterrows():
             index = int(row[0])
@@ -105,7 +112,7 @@ class CustomOptimizer:
                 self.known_values.at[l_index, 'blocked'] = True
             else:
                 area_indexes.add((l_index, index))
-                if len(area_indexes) == self.max_intervals:
+                if len(area_indexes) == self.forward_intervals:
                     break
 
             # Mark small interval (index, r_index) as blocked and skip its consideration
@@ -117,10 +124,68 @@ class CustomOptimizer:
                 self.known_values.at[index, 'blocked'] = True
             else:
                 area_indexes.add((index, r_index))
-                if len(area_indexes) == self.max_intervals:
+                if len(area_indexes) == self.forward_intervals:
                     break
 
         return area_indexes
+
+
+    def CreateBackwardIntervalSet(self):
+        if (self.known_values.shape[0] - 1) < self.forward_intervals:
+            # TODO: сделать проверку там где используется вывод на set empty
+            return set()
+
+        # Рассчитываем максимальное количество backward-интервалов которые можем рассмотреть
+        n_backwards_areas = (self.known_values.shape[0] - 1) - self.forward_intervals
+        n_backwards_areas = min(n_backwards_areas, self.backward_intervals)
+        if n_backwards_areas <= 0:
+            return set()
+
+        # Перемешиваем, чтобы не создавать преференцию по X
+        # и сортриуем в обратном порядке нежели чем в CreateIntervalSet()
+        Y_sort = self.known_values.sample(frac=1)
+        Y_sort = Y_sort.sort_values(by="Y", ascending=True, kind='stable')
+
+        # select only from non-blocked intervals
+        Y_sort = Y_sort[Y_sort["blocked"] == False]
+        area_indexes = set()
+        minmax_delta = (self.maxs[0] - self.mins[0])
+
+        for row in Y_sort.iterrows():
+            index = int(row[0])
+            l_index = index - 1
+            r_index = index + 1
+
+            if l_index < 0 or r_index >= Y_sort.shape[0]:
+                continue
+
+            # Mark small interval (l_index, index) as blocked and skip its consideration
+            xL = self.known_values.iloc[l_index]["X"]
+            xR = self.known_values.iloc[index]["X"]
+            dx = xR - xL
+            if abs(dx / minmax_delta) <= self.min_interval_size_ratio:
+                # self.known_values.iloc[l_index]["blocked"] = True
+                self.known_values.at[l_index, 'blocked'] = True
+            else:
+                area_indexes.add((l_index, index))
+                if len(area_indexes) == self.backward_intervals:
+                    break
+
+            # Mark small interval (index, r_index) as blocked and skip its consideration
+            xL = self.known_values.iloc[index]["X"]
+            xR = self.known_values.iloc[r_index]["X"]
+            dx = xR - xL
+            if abs(dx / minmax_delta) <= self.min_interval_size_ratio:
+                # self.known_values.iloc[index]["blocked"] = True
+                self.known_values.at[index, 'blocked'] = True
+            else:
+                area_indexes.add((index, r_index))
+                if len(area_indexes) == self.backward_intervals:
+                    break
+
+        return area_indexes
+
+
 
 
 
@@ -228,21 +293,64 @@ class CustomOptimizer:
         self.mins = mins
         self.maxs = maxs
 
+        backward_counter = self.backward_fires_each_n
         for i in range(max_epochs):
             if self.epochs == 0:
                 self.Warmup()
             else:
-                if not self.SelectIntervals():
+
+                forward = True
+                if backward_counter == 0:
+                    forward = False
+                    backward_counter = self.backward_fires_each_n
+                    print(f"Running backward iteration at epoch = {i}")
+                else:
+                    backward_counter -= 1
+
+                if not self.SelectIntervals(forward):
                     print(f"Stop iterations, no areas left to divide further")
                     break
                 self.UnitMapping()
                 new_X = self.CreateProbePoints()
                 self.RunValues(new_X)
+                self.FindPlatoRegions()
                 print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
             self.epochs += 1
 
         self.known_values.sort_values(by="Y", ascending=False, inplace=True)
         print(f"epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
-              f"top values:\n")
+              f"\n-------- top values:\n")
         print(self.known_values.head(5))
+
+
+    def FindPlatoRegions(self):
+
+        plato_x_eps = 10.0     # TODO: min_max_delta , min_size_ratio
+        plato_y_eps = 0.0001
+
+        # seek plato indexes
+        l_index = -1
+        r_index = -1
+        platos = []
+
+        for i in range(1, self.known_values.shape[0]):
+            prev_x = self.known_values.iloc[i - 1]["X"]
+            prev_y = self.known_values.iloc[i - 1]["Y"]
+
+            x = self.known_values.iloc[i]["X"]
+            y = self.known_values.iloc[i]["Y"]
+
+            if abs(x - prev_x) < plato_x_eps and abs(y - prev_y) < plato_y_eps:
+                if l_index < 0:
+                    l_index = i - 1
+                r_index = i
+            else:
+                if l_index != -1:
+                    lx = self.known_values.iloc[l_index]
+                    rx = self.known_values.iloc[r_index]
+                    platos.append([lx, rx])
+                    l_index = -1
+                    r_index = -1
+        return platos
+
