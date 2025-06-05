@@ -35,42 +35,43 @@ class TestCustomOptimizer(TestCase):
         # opt.known_values = opt.known_values._append({"X": 50, "Y": func(50)}, ignore_index=True)
         # opt.known_values = opt.known_values._append({"X": 100, "Y": func(100)}, ignore_index=True)
 
-        # opt.mins = [0]
-        # opt.maxs = [100]
-        # opt.Warmup()
+        opt.mins = [0]
+        opt.maxs = [100]
+        opt.Warmup()
 
-        # # Iteration 1
-        # opt.SelectIntervals()
-        # opt.UnitMapping()
-        # new_values = opt.CreateProbePoints()
-        # opt.RunValues(new_values)
-        #
-        # opt.SelectIntervals()
-        # opt.UnitMapping()
-        # new_values = opt.CreateProbePoints()
-        # opt.RunValues(new_values)
-        #
-        # opt.SelectIntervals()
-        # opt.UnitMapping()
-        # new_values = opt.CreateProbePoints()
-        # opt.RunValues(new_values)
-        #
-        # # areas = opt.CreateBackwardIntervalSet()
-        # opt.SelectIntervals(forward=False)
+        # Iteration 1
+        opt.SelectIntervals()
+        opt.UnitMapping()
+        new_values = opt.CreateProbePoints()
+        opt.RunValues(new_values)
+
+        opt.SelectIntervals()
+        opt.UnitMapping()
+        new_values = opt.CreateProbePoints()
+        opt.RunValues(new_values)
+
+        opt.SelectIntervals()
+        opt.UnitMapping()
+        new_values = opt.CreateProbePoints()
+        opt.RunValues(new_values)
+
+        # areas = opt.CreateBackwardIntervalSet()
+        opt.SelectIntervals(forward=False)
+
+        # Iteration 2
+        opt.SelectIntervals()
+        opt.UnitMapping()
+        new_values = opt.CreateProbePoints()
+        opt.RunValues(new_values)
 
 
-        # # Iteration 2
-        # opt.SelectIntervals()
-        # opt.UnitMapping()
-        # new_values = opt.CreateProbePoints()
-        # opt.RunValues(new_values)
+        # opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=3)
+        # plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
+        # plot.grid()
+        # plot.show()
 
-
-        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=3)
-        plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
-        plot.grid()
-        plot.show()
-
+        platos = opt.FindPlatoRegions()
+        opt.PlatoUnitMapping(platos)
         pass
 
 

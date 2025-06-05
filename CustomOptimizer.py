@@ -6,7 +6,7 @@ import pandas as pd
 
 class CustomOptimizer:
     def __init__(self, objective: callable):
-        self.known_values = pd.DataFrame(columns=["X", "Y", "blocked"])
+        self.known_values = pd.DataFrame(columns=["X", "Y", "blocked", "plato_block"])
         self.squeeze_factor = 0.8
         self.intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
         self.u_coords = []
@@ -247,7 +247,8 @@ class CustomOptimizer:
             self.known_values = self.known_values._append({
                 "X": x,
                 "Y": y,
-                "blocked": False
+                "blocked": False,
+                "plato_block": False
             }, ignore_index=True)
         self.known_values = self.known_values.sort_values(by="X")
         self.known_values.reset_index(inplace=True, drop=True)
@@ -262,14 +263,16 @@ class CustomOptimizer:
         self.known_values = self.known_values._append({
             "X": self.mins[0],
             "Y": y,
-            "blocked": False
+            "blocked": False,
+            "plato_block": False
         }, ignore_index=True)
 
         y = self.objective(self.maxs[0])
         self.known_values = self.known_values._append({
             "X": self.maxs[0],
             "Y": y,
-            "blocked": False
+            "blocked": False,
+            "plato_block": False
         }, ignore_index=True)
 
         middle = (self.mins[0] + self.maxs[0]) / 2.0
@@ -277,7 +280,8 @@ class CustomOptimizer:
         self.known_values = self.known_values._append({
             "X": middle,
             "Y": y,
-            "blocked": False
+            "blocked": False,
+            "plato_block": False
         }, ignore_index=True)
 
         # TODO: засунуть в функцию к self.objective(...) и вызывать вместе
@@ -313,7 +317,7 @@ class CustomOptimizer:
                 self.UnitMapping()
                 new_X = self.CreateProbePoints()
                 self.RunValues(new_X)
-                self.FindPlatoRegions()
+                # self.FindPlatoRegions()
                 print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
             self.epochs += 1
@@ -325,8 +329,8 @@ class CustomOptimizer:
 
 
     def FindPlatoRegions(self):
-
         plato_x_eps = 10.0     # TODO: min_max_delta , min_size_ratio
+        plato_dx_block = 2.0   # TODO: в процентах от X_min_max
         plato_y_eps = 0.0001
 
         # seek plato indexes
@@ -345,12 +349,49 @@ class CustomOptimizer:
                 if l_index < 0:
                     l_index = i - 1
                 r_index = i
+
+                if abs(x - prev_x) < plato_dx_block:
+                    # self.known_values.iloc[i - 1]["plato_block"] = True
+                    self.known_values.at[i - 1, 'plato_block'] = True
+
             else:
                 if l_index != -1:
-                    lx = self.known_values.iloc[l_index]
-                    rx = self.known_values.iloc[r_index]
-                    platos.append([lx, rx])
+                    # lx = self.known_values.iloc[l_index]
+                    # rx = self.known_values.iloc[r_index]
+                    platos.append([l_index, r_index])
                     l_index = -1
                     r_index = -1
         return platos
 
+
+    def PlatoUnitMapping(self, platos: list):
+        plato_regions = []
+
+        sum_shapes = 0.0
+        for p in platos:
+            l_index = p[0]
+            r_index = p[1]
+
+            # Select plato-region
+            region = self.known_values.iloc[l_index: r_index + 1]
+
+            # filter out "plato_block" rows
+            non_blocked = region[region["plato_block"] == False]
+
+            # saving original table index column to unmap values from it later
+            non_blocked["original_index"] = non_blocked.index
+            non_blocked.reset_index(inplace=True, drop=True)
+
+            plato_regions.append(non_blocked)
+            sum_shapes += non_blocked.shape[0]
+
+
+        region_ucoords = dict()     # table index -> tuple(u_start, u_end)
+        u_cursor = 0.0
+        u_gap = 0.01
+        for i, t in enumerate(plato_regions):
+            w = float(t.shape[0]) / sum_shapes
+            region_ucoords[i] = (u_cursor, u_cursor + w)
+            u_cursor += w + u_gap
+
+        TODO: u_pick

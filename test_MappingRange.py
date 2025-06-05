@@ -141,3 +141,16 @@ class TestMappingRange(TestCase):
 
 
 
+    def test_tables_unitmapping(self):
+
+        # здесь нужно заменить на сам array таблиц а не их размеров
+        tables_shapes = [10, 24, 3, 19]
+        sum_shapes = sum(tables_shapes)
+
+        plato_ucoords = []
+        u_cursor = 0.0
+        u_gap = 0.01
+        for s in tables_shapes:
+            w = float(s) / sum_shapes
+            plato_ucoords.append((u_cursor, u_cursor + w))
+            u_cursor += w + u_gap
