@@ -31,25 +31,26 @@ class TestCustomOptimizer(TestCase):
         opt = CustomOptimizer(objective=const_func)
         opt.n_probes = 4
 
-        # opt.known_values = opt.known_values._append({"X": 0, "Y": func(0)}, ignore_index=True)
-        # opt.known_values = opt.known_values._append({"X": 50, "Y": func(50)}, ignore_index=True)
-        # opt.known_values = opt.known_values._append({"X": 100, "Y": func(100)}, ignore_index=True)
+        opt.mins = [0]
+        opt.maxs = [100]
+        opt.Warmup()
 
-        # opt.mins = [0]
-        # opt.maxs = [100]
-        # opt.Warmup()
+        # Iteration 1
+        opt.SelectIntervals()
+        opt.UnitMapping()
+        new_values = opt.CreateProbePoints()
+        opt.RunValues(new_values)
+        plato_indexes = opt.FindPlatoRegions()
+        opt.MarkPlatoRegions()
 
-        # # Iteration 1
-        # opt.SelectIntervals()
-        # opt.UnitMapping()
-        # new_values = opt.CreateProbePoints()
-        # opt.RunValues(new_values)
-        #
-        # opt.SelectIntervals()
-        # opt.UnitMapping()
-        # new_values = opt.CreateProbePoints()
-        # opt.RunValues(new_values)
-        #
+
+        opt.SelectIntervals()
+        opt.UnitMapping()
+        new_values = opt.CreateProbePoints()
+        opt.RunValues(new_values)
+        plato_indexes = opt.FindPlatoRegions()
+        opt.MarkPlatoRegions()
+
         # opt.SelectIntervals()
         # opt.UnitMapping()
         # new_values = opt.CreateProbePoints()
@@ -67,13 +68,34 @@ class TestCustomOptimizer(TestCase):
         # platos = opt.FindPlatoRegions()
         # opt.PlatoUnitMapping(platos)
 
-        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=10)
+        plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
+        plot.grid()
+        plot.show()
+        pass
+
+
+
+    def test_RunCycle(self):
+        opt = CustomOptimizer(objective=const_func)
+        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=5)
+
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
         plot.show()
 
 
+
+    def test_GeneratePlatoPoints_TableSize1(self):
+        data = pd.read_csv("debug_values_3.csv")
+        opt = CustomOptimizer(objective=const_func)
+        opt.known_values = data
+        opt.mins = [0]
+        opt.maxs = [100]
+
+        plato_indexes = opt.FindPlatoRegions()
+        opt.GeneratePlatoPoints(plato_indexes)
         pass
+
 
 
 
@@ -117,41 +139,40 @@ class TestCustomOptimizer(TestCase):
 
 
     def test_mark_plato_regions(self):
-        X = np.arange(0, 6.2831, 3.141592 / 12)
-        Y = np.sin(X)
-        Y = np.clip(Y, -0.4, 0.4)
+        X = [0, 1, 2, 3, 4, 5]
+        Y = [5, 5, 5, 3, 3, 3]
 
-        eps = 0.0001
+        eps = 0.01
 
         data = pd.DataFrame()
         data["X"] = X
         data["Y"] = Y
-
 
         # seek plato indexes
         l_index = -1
         r_index = -1
         platos = []
 
-        for i in range(1, data.shape[0]):
+        for i in range(data.shape[0] - 1):
             x = data.iloc[i]["X"]
-
-            prev_y = data.iloc[i - 1]["Y"]
             y = data.iloc[i]["Y"]
 
-            if abs(y - prev_y) < eps:
+            next_y = data.iloc[i + 1]["Y"]
+
+            if abs(next_y - y) < eps:
                 if l_index < 0:
-                    l_index = i - 1
+                    l_index = i
                 r_index = i
             else:
                 if l_index != -1:
-                    lx = data.iloc[l_index]["X"]
-                    rx = data.iloc[r_index]["X"]
-                    platos.append([lx, rx])
+                    platos.append([l_index, r_index])
                     l_index = -1
                     r_index = -1
 
-            pass
+        if l_index != -1:
+            platos.append([l_index, r_index])
+            l_index = -1
+            r_index = -1
 
         plot.plot(X, Y, 'b.')
         plot.plot(X, Y, 'b')
@@ -170,6 +191,20 @@ class TestCustomOptimizer(TestCase):
             if new_region[0] <= item[0] and new_region[1] >= item[1]:
                 print(f"new_region {new_region} expanded {item}")
         pass
+
+
+
+    def test_pandas_exclude_regions(self):
+        data = pd.DataFrame()
+        data["X"] = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        data["Y"] = [19, 2, -88, -4, 3, 9, -8, 89, 100]
+        pairs = [(0, 2), (5, 7)]
+
+        data = data.drop(index=range(0, 3))
+        data = data.drop(index=range(5, 7))
+        pass
+
+
 
 
 

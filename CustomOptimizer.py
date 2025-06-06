@@ -6,7 +6,7 @@ import pandas as pd
 
 class CustomOptimizer:
     def __init__(self, objective: callable):
-        self.known_values = pd.DataFrame(columns=["X", "Y", "blocked", "plato_block"])
+        self.known_values = pd.DataFrame(columns=["X", "Y", "blocked", "plato_block", "plato"])
         self.squeeze_factor = 0.8
         self.intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
         self.u_coords = []
@@ -95,6 +95,10 @@ class CustomOptimizer:
 
         # select only from non-blocked intervals
         Y_sort = Y_sort[Y_sort["blocked"] == False]
+
+        # Also filter out potential plato regions
+        Y_sort = Y_sort[Y_sort["plato"] == False]
+
         area_indexes = set()
         minmax_delta = (self.maxs[0] - self.mins[0])
 
@@ -151,6 +155,10 @@ class CustomOptimizer:
 
         # select only from non-blocked intervals
         Y_sort = Y_sort[Y_sort["blocked"] == False]
+
+        # Also filter out potential plato regions
+        Y_sort = Y_sort[Y_sort["plato"] == False]
+
         area_indexes = set()
         minmax_delta = (self.maxs[0] - self.mins[0])
 
@@ -251,7 +259,8 @@ class CustomOptimizer:
                 "X": x,
                 "Y": y,
                 "blocked": False,
-                "plato_block": False
+                "plato_block": False,
+                "plato": False
             }, ignore_index=True)
         self.known_values = self.known_values.sort_values(by="X")
         self.known_values.reset_index(inplace=True, drop=True)
@@ -267,7 +276,8 @@ class CustomOptimizer:
             "X": self.mins[0],
             "Y": y,
             "blocked": False,
-            "plato_block": False
+            "plato_block": False,
+            "plato": False
         }, ignore_index=True)
 
         y = self.objective(self.maxs[0])
@@ -275,7 +285,8 @@ class CustomOptimizer:
             "X": self.maxs[0],
             "Y": y,
             "blocked": False,
-            "plato_block": False
+            "plato_block": False,
+            "plato": False
         }, ignore_index=True)
 
         middle = (self.mins[0] + self.maxs[0]) / 2.0
@@ -284,7 +295,8 @@ class CustomOptimizer:
             "X": middle,
             "Y": y,
             "blocked": False,
-            "plato_block": False
+            "plato_block": False,
+            "plato": False
         }, ignore_index=True)
 
         # TODO: засунуть в функцию к self.objective(...) и вызывать вместе
@@ -309,17 +321,16 @@ class CustomOptimizer:
 
                 # Check if it is a plato stage
                 if plato_countdown == 0:
-                    print(f" >>> running plato iteration")
+                    print(f" >>> running plato iteration at epoch = {self.epochs}")
                     plato_countdown = self.plato_fires_each_n
                     if len(self.plato_indexes) == 0:
                         print(f"no plato detected, skip plato iteration")
                         continue
-                    new_X = self.PlatoUnitMapping(self.plato_indexes)
+                    new_X = self.GeneratePlatoPoints(self.plato_indexes)
                     self.RunValues(new_X)
                     continue
                 else:
                     plato_countdown -= 1
-
 
                 # Check if it is backward pass stage
                 is_forward = True
@@ -338,6 +349,8 @@ class CustomOptimizer:
                 new_X = self.CreateProbePoints()
                 self.RunValues(new_X)
                 self.plato_indexes = self.FindPlatoRegions()
+                self.MarkPlatoRegions()
+
                 print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
             self.epochs += 1
@@ -353,48 +366,67 @@ class CustomOptimizer:
         plato_dx_block = 2.0   # TODO: в процентах от X_min_max ?
         plato_y_eps = 0.0001
 
+        # -----------------
+        # reset plato before new recalculation
+        self.known_values.loc[:, "plato"] = False
+
         # seek plato indexes
         l_index = -1
         r_index = -1
         platos = []
 
-        for i in range(1, self.known_values.shape[0]):
-            prev_x = self.known_values.iloc[i - 1]["X"]
-            prev_y = self.known_values.iloc[i - 1]["Y"]
-
+        for i in range(self.known_values.shape[0] - 1):
             x = self.known_values.iloc[i]["X"]
             y = self.known_values.iloc[i]["Y"]
 
-            if abs(x - prev_x) < plato_x_eps and abs(y - prev_y) < plato_y_eps:
+            next_x = self.known_values.iloc[i + 1]["X"]
+            next_y = self.known_values.iloc[i + 1]["Y"]
+
+            if abs(next_x - x) < plato_x_eps and abs(next_y - y) < plato_y_eps:
                 if l_index < 0:
-                    l_index = i - 1
+                    l_index = i
                 r_index = i
 
-                if abs(x - prev_x) < plato_dx_block:
-                    # self.known_values.iloc[i - 1]["plato_block"] = True
+                if abs(next_x - x) < plato_dx_block:
                     self.known_values.at[i - 1, 'plato_block'] = True
 
             else:
                 if l_index != -1:
-                    # lx = self.known_values.iloc[l_index]
-                    # rx = self.known_values.iloc[r_index]
                     platos.append([l_index, r_index])
                     l_index = -1
                     r_index = -1
+
+        if l_index != -1:
+            platos.append([l_index, r_index])
         return platos
 
 
+    def MarkPlatoRegions(self):
+        if len(self.plato_indexes) == 0:
+            return
+
+        for index_pair in self.plato_indexes:
+            iL = index_pair[0]
+            iR = index_pair[1]
+            if 0 < iL < self.known_values.shape[0] - 1 and iL < iR:
+                iL = iL + 1
+            self.known_values.loc[iL : iR, "plato"] = True
+
+
+
+
+
     # TODO: задокументировать как работает плато часть
-    def PlatoUnitMapping(self, platos: list):
+    def GeneratePlatoPoints(self, plato_indexes: list):
         plato_regions = []
 
         sum_shapes = 0.0
-        for p in platos:
+        for p in plato_indexes:
             l_index = p[0]
             r_index = p[1]
 
             # Select plato-region
-            region = self.known_values.iloc[l_index: r_index + 1]
+            region = self.known_values.iloc[l_index: r_index + 2]
 
             # filter out "plato_block" rows
             non_blocked = region[region["plato_block"] == False]
@@ -441,6 +473,9 @@ class CustomOptimizer:
                     if row_index < tgt_table.shape[0] - 1:
                         X_value = (tgt_table.iloc[row_index]["X"] + tgt_table.iloc[row_index + 1]["X"]) / 2.0
                     else:
+                        TODO: если мы здесь - значит мы вышли за границы tgt_tables,
+                        а значит за пределы этого плато-региона
+
                         unmapped_index = tgt_table.iloc[row_index]["original_index"]
                         if unmapped_index < self.known_values.shape[0] - 1:
                             X_l = self.known_values.iloc[unmapped_index]["X"]
