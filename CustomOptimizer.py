@@ -394,4 +394,36 @@ class CustomOptimizer:
             region_ucoords[i] = (u_cursor, u_cursor + w)
             u_cursor += w + u_gap
 
-        TODO: u_pick
+
+        # u_pick - pick u-values and unmapping into real x values
+        num_probes = self.n_probes
+        assert num_probes > 0
+        u_len = u_cursor - u_gap
+        u_step = u_len / (num_probes + 1)
+        out_X = [0.0] * num_probes
+        u_pick = u_step
+
+        for i in range(num_probes):
+            u_potential_gap_hit = False
+
+            for k, u_coords in region_ucoords.items():
+                if u_potential_gap_hit:
+                    if u_pick < u_coords[0]:
+                        u_pick = u_coords[0] + 0.01 * (u_coords[1] - u_coords[0])
+
+                if u_coords[0] <= u_pick <= u_coords[1]:
+                    alpha = (u_pick - u_coords[0]) / (u_coords[1] - u_coords[0])
+                    tgt_table = plato_regions[k]
+                    idx_range = tgt_table.index
+                    row_index = int((idx_range.stop - idx_range.start) * alpha)
+                    # unmapped_index = tgt_table.iloc[row_index]["original_index"]
+                    X_value = tgt_table.iloc[row_index]["X"]
+                    out_X[i] = X_value
+                    break
+
+                else:
+                    u_potential_gap_hit = True
+
+            u_pick += u_step
+
+        return out_X
