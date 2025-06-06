@@ -14,6 +14,7 @@ class CustomOptimizer:
         self.forward_intervals = 7
         self.backward_intervals = 3
         self.backward_fires_each_n = 5
+        self.plato_fires_each_n = 2
         self.objective = objective
         self.epochs = 0
         self.internal_itr = 0
@@ -21,6 +22,8 @@ class CustomOptimizer:
         self.names = []
         self.mins = []
         self.maxs = []
+
+        self.plato_indexes = []
 
         self.eps = 0.001
         self.min_interval_size_ratio = 0.01
@@ -297,27 +300,44 @@ class CustomOptimizer:
         self.mins = mins
         self.maxs = maxs
 
-        backward_counter = self.backward_fires_each_n
+        backward_countdown = self.backward_fires_each_n
+        plato_countdown = self.plato_fires_each_n
         for i in range(max_epochs):
             if self.epochs == 0:
                 self.Warmup()
             else:
 
-                forward = True
-                if backward_counter == 0:
-                    forward = False
-                    backward_counter = self.backward_fires_each_n
-                    print(f"Running backward iteration at epoch = {i}")
+                # Check if it is a plato stage
+                if plato_countdown == 0:
+                    print(f" >>> running plato iteration")
+                    plato_countdown = self.plato_fires_each_n
+                    if len(self.plato_indexes) == 0:
+                        print(f"no plato detected, skip plato iteration")
+                        continue
+                    new_X = self.PlatoUnitMapping(self.plato_indexes)
+                    self.RunValues(new_X)
+                    continue
                 else:
-                    backward_counter -= 1
+                    plato_countdown -= 1
 
-                if not self.SelectIntervals(forward):
-                    print(f"Stop iterations, no areas left to divide further")
+
+                # Check if it is backward pass stage
+                is_forward = True
+                if backward_countdown == 0:
+                    is_forward = False
+                    backward_countdown = self.backward_fires_each_n
+                    print(f" >>> running backward iteration at epoch = {i}")
+                else:
+                    backward_countdown -= 1
+
+                # TODO: как исключить плато-регионы на обычной итерации?
+                if not self.SelectIntervals(is_forward):
+                    print(f"stop iterations, no areas left to divide further")
                     break
                 self.UnitMapping()
                 new_X = self.CreateProbePoints()
                 self.RunValues(new_X)
-                # self.FindPlatoRegions()
+                self.plato_indexes = self.FindPlatoRegions()
                 print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
             self.epochs += 1
@@ -329,8 +349,8 @@ class CustomOptimizer:
 
 
     def FindPlatoRegions(self):
-        plato_x_eps = 10.0     # TODO: min_max_delta , min_size_ratio
-        plato_dx_block = 2.0   # TODO: в процентах от X_min_max
+        plato_x_eps = 10.0     # TODO: min_max_delta , min_size_ratio ?
+        plato_dx_block = 2.0   # TODO: в процентах от X_min_max ?
         plato_y_eps = 0.0001
 
         # seek plato indexes
@@ -364,6 +384,7 @@ class CustomOptimizer:
         return platos
 
 
+    # TODO: задокументировать как работает плато часть
     def PlatoUnitMapping(self, platos: list):
         plato_regions = []
 
@@ -416,8 +437,20 @@ class CustomOptimizer:
                     tgt_table = plato_regions[k]
                     idx_range = tgt_table.index
                     row_index = int((idx_range.stop - idx_range.start) * alpha)
-                    # unmapped_index = tgt_table.iloc[row_index]["original_index"]
-                    X_value = tgt_table.iloc[row_index]["X"]
+
+                    if row_index < tgt_table.shape[0] - 1:
+                        X_value = (tgt_table.iloc[row_index]["X"] + tgt_table.iloc[row_index + 1]["X"]) / 2.0
+                    else:
+                        unmapped_index = tgt_table.iloc[row_index]["original_index"]
+                        if unmapped_index < self.known_values.shape[0] - 1:
+                            X_l = self.known_values.iloc[unmapped_index]["X"]
+                            X_r = self.known_values.iloc[unmapped_index + 1]["X"]
+                            X_value = (X_l + X_r) / 2.0
+                        else:
+                            X_l = self.known_values.iloc[unmapped_index - 1]["X"]
+                            X_r = self.known_values.iloc[unmapped_index]["X"]
+                            X_value = (X_l + X_r) / 2.0
+
                     out_X[i] = X_value
                     break
 
