@@ -40,7 +40,7 @@ class TestCustomOptimizer(TestCase):
         opt.UnitMapping()
         new_values = opt.CreateProbePoints()
         opt.RunValues(new_values)
-        plato_indexes = opt.FindPlatoRegions()
+        opt.plato_indexes = opt.FindPlatoRegions()
         opt.MarkPlatoRegions()
 
 
@@ -48,25 +48,22 @@ class TestCustomOptimizer(TestCase):
         opt.UnitMapping()
         new_values = opt.CreateProbePoints()
         opt.RunValues(new_values)
-        plato_indexes = opt.FindPlatoRegions()
+        opt.plato_indexes = opt.FindPlatoRegions()
         opt.MarkPlatoRegions()
 
-        # opt.SelectIntervals()
-        # opt.UnitMapping()
-        # new_values = opt.CreateProbePoints()
-        # opt.RunValues(new_values)
-        #
-        # # areas = opt.CreateBackwardIntervalSet()
-        # opt.SelectIntervals(forward=False)
-        #
-        # # Iteration 2
-        # opt.SelectIntervals()
-        # opt.UnitMapping()
-        # new_values = opt.CreateProbePoints()
-        # opt.RunValues(new_values)
 
-        # platos = opt.FindPlatoRegions()
-        # opt.PlatoUnitMapping(platos)
+        opt.SelectIntervals()
+        opt.UnitMapping()
+        new_values = opt.CreateProbePoints()
+        opt.RunValues(new_values)
+        opt.plato_indexes = opt.FindPlatoRegions()
+        opt.MarkPlatoRegions()
+
+
+
+        opt.SelectIntervals(forward=False)
+
+
 
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
@@ -76,8 +73,9 @@ class TestCustomOptimizer(TestCase):
 
 
     def test_RunCycle(self):
-        opt = CustomOptimizer(objective=const_func)
-        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=5)
+        opt = CustomOptimizer(objective=gaussian)
+        opt.squeeze_factor = 0.5
+        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=6)
 
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
@@ -93,7 +91,9 @@ class TestCustomOptimizer(TestCase):
         opt.maxs = [100]
 
         plato_indexes = opt.FindPlatoRegions()
-        opt.GeneratePlatoPoints(plato_indexes)
+        opt.plato_indexes = plato_indexes
+        opt.MarkPlatoRegions()
+        # opt.GeneratePlatoPoints(plato_indexes)
         pass
 
 
@@ -140,7 +140,7 @@ class TestCustomOptimizer(TestCase):
 
     def test_mark_plato_regions(self):
         X = [0, 1, 2, 3, 4, 5]
-        Y = [5, 5, 5, 3, 3, 3]
+        Y = [4, 5, 5, 5, 5, 8]
 
         eps = 0.01
 
@@ -206,6 +206,19 @@ class TestCustomOptimizer(TestCase):
 
 
 
+    def test_mark_plato(self):
+        data = pd.DataFrame(columns=["Y", "plato"])
+        data["Y"] = [4, 5, 5, 5, 8]
+        data["plato"] = [False, False, False, False, False]
+        region = (1, 2)
 
+        if region[0] >= region[1]:
+            print(f"Don't do anything")
 
+        if region[0] > 0:
+            data.loc[region[0] + 1 : region[1], 'plato'] = True
+        else:
+            data.loc[region[0] : region[1], 'plato'] = True
+
+        pass
 
