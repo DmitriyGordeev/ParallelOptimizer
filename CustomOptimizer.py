@@ -417,8 +417,9 @@ class CustomOptimizer:
 
 
         self.known_values.sort_values(by="Y", ascending=False, inplace=True)
-        print(f"epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
-              f"\n-------- top values:\n")
+        print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ")
+        print(f"Total epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
+              f"\ntop values: -------------------- \n")
         print(self.known_values.head(5))
 
 
