@@ -6,6 +6,7 @@ import matplotlib.pyplot as plot
 
 
 
+
 class CustomOptimizer:
     def __init__(self, objective: callable):
         self.known_values = pd.DataFrame(columns=["X", "Y", "blocked", "plato_block", "plato_index", "plato_edge"])
@@ -365,6 +366,10 @@ class CustomOptimizer:
                     self.debug_old_X = self.known_values["X"].to_list()
                     self.debug_old_Y = self.known_values["Y"].to_list()
 
+                    if len(new_X) == 0:
+                        print("Plato run: new_X is empty array, skip this iteration")
+                        continue
+
                     self.RunValues(new_X)
                     self.DebugPlot("plato")
 
@@ -478,88 +483,96 @@ class CustomOptimizer:
 
     # TODO: задокументировать как работает плато часть
     def GeneratePlatoPoints(self, plato_indexes: list):
-        plato_regions = []
-
-        sum_shapes = 0.0
-        for p in plato_indexes:
-            l_index = p[0]
-            r_index = p[1]
-
-            # Select plato-region
-            region = self.known_values.iloc[l_index: r_index + 2]
-
-            # filter out "plato_block" rows
-            non_blocked = region[region["plato_block"] == False]
-
-            # saving original table index column to unmap values from it later
-            non_blocked["original_index"] = non_blocked.index
-            non_blocked.reset_index(inplace=True, drop=True)
-
-            plato_regions.append(non_blocked)
-            sum_shapes += non_blocked.shape[0]
+        plato_module = PlatoModule(self)
+        plato_module.GroupTables(plato_indexes)
+        u_cursor = plato_module.UnitMapRegions()
+        out_values = plato_module.UnmapValues(u_cursor)
+        return out_values
 
 
-        region_ucoords = dict()     # table index -> tuple(u_start, u_end)
-        u_cursor = 0.0
-        u_gap = 0.01
-        for i, t in enumerate(plato_regions):
-            w = float(t.shape[0]) / sum_shapes
-            region_ucoords[i] = (u_cursor, u_cursor + w)
-            u_cursor += w + u_gap
 
-
-        # u_pick - pick u-values and unmapping into real x values
-        num_probes = self.n_probes
-        assert num_probes > 0
-        u_len = u_cursor - u_gap
-        u_step = u_len / (num_probes + 1)
-        out_X = []
-        u_pick = u_step
-
-        for i in range(num_probes):
-            u_potential_gap_hit = False
-
-            for k, u_coords in region_ucoords.items():
-                if u_potential_gap_hit:
-                    if u_pick < u_coords[0]:
-                        u_pick = u_coords[0] + 0.01 * (u_coords[1] - u_coords[0])
-
-                if u_coords[0] <= u_pick <= u_coords[1]:
-                    alpha = (u_pick - u_coords[0]) / (u_coords[1] - u_coords[0])
-                    tgt_table = plato_regions[k]
-                    idx_range = tgt_table.index
-                    row_index = int(((idx_range.stop - 1) - idx_range.start) * alpha)
-
-                    if row_index < tgt_table.shape[0] - 1:
-                        X_value = (tgt_table.iloc[row_index]["X"] + tgt_table.iloc[row_index + 1]["X"]) / 2.0
-
-                    else:
-                        # TODO: если мы здесь - значит мы вышли за границы tgt_tables,
-                        #   а значит за пределы этого плато-региона
-
-                        unmapped_index = tgt_table.iloc[row_index]["original_index"]
-                        if unmapped_index < self.known_values.shape[0] - 1:
-                            X_l = self.known_values.iloc[unmapped_index]["X"]
-                            X_r = self.known_values.iloc[unmapped_index + 1]["X"]
-                            X_value = (X_l + X_r) / 2.0
-
-                        else:
-                            X_l = self.known_values.iloc[unmapped_index - 1]["X"]
-                            X_r = self.known_values.iloc[unmapped_index]["X"]
-                            X_value = (X_l + X_r) / 2.0
-
-                    # TODO: Set ?
-                    if X_value not in out_X:
-                        out_X.append(X_value)
-
-                    break
-
-                else:
-                    u_potential_gap_hit = True
-
-            u_pick += u_step
-
-        return out_X
+        # plato_regions = []
+        #
+        # sum_shapes = 0.0
+        # for p in plato_indexes:
+        #     l_index = p[0]
+        #     r_index = p[1]
+        #
+        #     # Select plato-region
+        #     region = self.known_values.iloc[l_index: r_index + 2]
+        #
+        #     # filter out "plato_block" rows
+        #     non_blocked = region[region["plato_block"] == False]
+        #
+        #     # saving original table index column to unmap values from it later
+        #     non_blocked["original_index"] = non_blocked.index
+        #     non_blocked.reset_index(inplace=True, drop=True)
+        #
+        #     plato_regions.append(non_blocked)
+        #     sum_shapes += non_blocked.shape[0]
+        #
+        #
+        # region_ucoords = dict()     # table index -> tuple(u_start, u_end)
+        # u_cursor = 0.0
+        # u_gap = 0.01
+        # for i, t in enumerate(plato_regions):
+        #     w = float(t.shape[0]) / sum_shapes
+        #     region_ucoords[i] = (u_cursor, u_cursor + w)
+        #     u_cursor += w + u_gap
+        #
+        #
+        # # u_pick - pick u-values and unmapping into real x values
+        # num_probes = self.n_probes
+        # assert num_probes > 0
+        # u_len = u_cursor - u_gap
+        # u_step = u_len / (num_probes + 1)
+        # out_X = []
+        # u_pick = u_step
+        #
+        # for i in range(num_probes):
+        #     u_potential_gap_hit = False
+        #
+        #     for k, u_coords in region_ucoords.items():
+        #         if u_potential_gap_hit:
+        #             if u_pick < u_coords[0]:
+        #                 u_pick = u_coords[0] + 0.01 * (u_coords[1] - u_coords[0])
+        #
+        #         if u_coords[0] <= u_pick <= u_coords[1]:
+        #             alpha = (u_pick - u_coords[0]) / (u_coords[1] - u_coords[0])
+        #             tgt_table = plato_regions[k]
+        #             idx_range = tgt_table.index
+        #             row_index = int(((idx_range.stop - 1) - idx_range.start) * alpha)
+        #
+        #             if row_index < tgt_table.shape[0] - 1:
+        #                 X_value = (tgt_table.iloc[row_index]["X"] + tgt_table.iloc[row_index + 1]["X"]) / 2.0
+        #
+        #             else:
+        #                 # TODO: если мы здесь - значит мы вышли за границы tgt_tables,
+        #                 #   а значит за пределы этого плато-региона
+        #
+        #                 unmapped_index = tgt_table.iloc[row_index]["original_index"]
+        #                 if unmapped_index < self.known_values.shape[0] - 1:
+        #                     X_l = self.known_values.iloc[unmapped_index]["X"]
+        #                     X_r = self.known_values.iloc[unmapped_index + 1]["X"]
+        #                     X_value = (X_l + X_r) / 2.0
+        #
+        #                 else:
+        #                     X_l = self.known_values.iloc[unmapped_index - 1]["X"]
+        #                     X_r = self.known_values.iloc[unmapped_index]["X"]
+        #                     X_value = (X_l + X_r) / 2.0
+        #
+        #             # TODO: Set ?
+        #             if X_value not in out_X:
+        #                 out_X.append(X_value)
+        #
+        #             break
+        #
+        #         else:
+        #             u_potential_gap_hit = True
+        #
+        #     u_pick += u_step
+        #
+        # return out_X
 
 
 
@@ -574,3 +587,10 @@ class CustomOptimizer:
         self.debug_old_Y = []
         self.debug_new_X = []
         self.debug_new_Y = []
+
+
+
+
+# ======================================================================================
+# Avoid circular import
+from PlatoModule import PlatoModule

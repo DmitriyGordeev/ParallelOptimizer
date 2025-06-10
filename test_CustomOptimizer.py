@@ -43,7 +43,6 @@ class TestCustomOptimizer(TestCase):
         opt.plato_indexes = opt.FindPlatoRegions()
         opt.MarkPlatoRegions()
 
-
         opt.SelectIntervals()
         opt.UnitMapping()
         new_values = opt.CreateProbePoints()
@@ -51,17 +50,14 @@ class TestCustomOptimizer(TestCase):
         opt.plato_indexes = opt.FindPlatoRegions()
         opt.MarkPlatoRegions()
 
-
         opt.SelectIntervals()
         opt.UnitMapping()
         new_values = opt.CreateProbePoints()
         opt.RunValues(new_values)
         opt.plato_indexes = opt.FindPlatoRegions()
         opt.MarkPlatoRegions()
-
 
         opt.SelectIntervals(forward=False)
-
 
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
@@ -71,7 +67,7 @@ class TestCustomOptimizer(TestCase):
 
 
     def test_RunCycle(self):
-        opt = CustomOptimizer(objective=gaussian)
+        opt = CustomOptimizer(objective=const_func)
         opt.squeeze_factor = 0.5
         opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=10)
 
@@ -81,8 +77,8 @@ class TestCustomOptimizer(TestCase):
 
 
 
-    def test_GeneratePlatoPoints_TableSize1(self):
-        data = pd.read_csv("debug_values_3.csv")
+    def test_GeneratePlatoPoints_BakedTable(self):
+        data = pd.read_csv("debug_values_4.csv")
         opt = CustomOptimizer(objective=const_func)
         opt.known_values = data
         opt.mins = [0]
@@ -91,8 +87,15 @@ class TestCustomOptimizer(TestCase):
         plato_indexes = opt.FindPlatoRegions()
         opt.plato_indexes = plato_indexes
         opt.MarkPlatoRegions()
-        # opt.GeneratePlatoPoints(plato_indexes)
-        pass
+        out_values = opt.GeneratePlatoPoints(plato_indexes)
+
+        out_values = sorted(out_values)
+        test_values = sorted(list({16.021888000000008, 33.43104288000001, 47.2492, 69.27472863999999, 82.6336}))
+
+        self.assertEqual(len(out_values), len(test_values))
+        for i in range(len(test_values)):
+            self.assertAlmostEqual(out_values[i], test_values[i], 5)
+
 
 
 
@@ -107,10 +110,9 @@ class TestCustomOptimizer(TestCase):
 
 
 
-    def test_select_intervals_around(self):
+    def test_select_intervals(self):
         X_sort = pd.read_csv("debug_values.csv")
         X_sort.drop(X_sort.columns[0], axis=1, inplace=True)
-
         Y_sort = X_sort.sort_values(by="Y", ascending=False)
 
         area_indexes = set()
@@ -136,7 +138,7 @@ class TestCustomOptimizer(TestCase):
 
 
 
-    def test_mark_plato_regions(self):
+    def test_find_plato_regions(self):
         X = [0, 1, 2, 3, 4, 5]
         Y = [4, 5, 5, 5, 5, 8]
 
@@ -177,48 +179,6 @@ class TestCustomOptimizer(TestCase):
         plot.grid()
         plot.show()
 
-
-
-    def test_search_expanded_regions(self):
-        old_map = [[10, 23], [30, 40], [60, 80]]
-        new_region = [3, 46]
-
-        new_map = []
-
-        for item in old_map:
-            if new_region[0] <= item[0] and new_region[1] >= item[1]:
-                print(f"new_region {new_region} expanded {item}")
-        pass
-
-
-
-    def test_pandas_exclude_regions(self):
-        data = pd.DataFrame()
-        data["X"] = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-        data["Y"] = [19, 2, -88, -4, 3, 9, -8, 89, 100]
-        pairs = [(0, 2), (5, 7)]
-
-        data = data.drop(index=range(0, 3))
-        data = data.drop(index=range(5, 7))
-        pass
-
-
-
-    def test_mark_plato(self):
-        data = pd.DataFrame(columns=["Y", "plato"])
-        data["Y"] = [4, 5, 5, 5, 8]
-        data["plato"] = [False, False, False, False, False]
-        region = (1, 2)
-
-        if region[0] >= region[1]:
-            print(f"Don't do anything")
-
-        if region[0] > 0:
-            data.loc[region[0] + 1 : region[1], 'plato'] = True
-        else:
-            data.loc[region[0] : region[1], 'plato'] = True
-
-        pass
 
 
     def test_save_plot(self):
