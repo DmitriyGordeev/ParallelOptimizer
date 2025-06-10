@@ -14,9 +14,9 @@ class CustomOptimizer:
         self.intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
         self.u_coords = []
         self.n_probes = 5
-        self.forward_intervals = 7
+        self.num_forward_intervals = 7
         self.backward_intervals = 3
-        self.backward_fires_each_n = 5
+        self.backward_fires_each_n = 4
         self.plato_fires_each_n = 2
         self.objective = objective
         self.epochs = 0
@@ -28,8 +28,10 @@ class CustomOptimizer:
 
         self.plato_indexes = []
 
-        self.eps = 0.001
-        self.min_interval_size_ratio = 0.01
+        self.block_eps = 1.0
+        self.plato_eps = 10.0
+        self.plato_block_eps = 2.0
+        self.plato_objective_eps = 0.01
 
         # Debug --------------
         self.debug_old_X = []
@@ -109,60 +111,78 @@ class CustomOptimizer:
         Y_sort = Y_sort[(Y_sort["plato_index"] == -1) | (Y_sort["plato_edge"] == True)]
 
         area_indexes = set()
-        minmax_delta = (self.maxs[0] - self.mins[0])
+        # minmax_delta = (self.maxs[0] - self.mins[0])
 
         for row in Y_sort.iterrows():
             index = int(row[0])
             l_index = index - 1
             r_index = index + 1
 
-            # if l_index < 0 or r_index >= Y_sort.shape[0]:
-            #     continue
-
             if l_index >= 0:
-                plato_index_l = self.known_values.iloc[l_index]["plato_index"]
-                plato_index_r = self.known_values.iloc[index]["plato_index"]
-                if plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r):
-                    xL = self.known_values.iloc[l_index]["X"]
-                    xR = self.known_values.iloc[index]["X"]
-                    dx = xR - xL
-
-                    # Mark small interval (l_index, index) as blocked and skip its consideration
-                    if abs(dx / minmax_delta) <= self.min_interval_size_ratio:
-                        # self.known_values.iloc[l_index]["blocked"] = True
-                        self.known_values.at[l_index, 'blocked'] = True
-                    else:
-                        area_indexes.add((l_index, index))
-                        if len(area_indexes) == self.forward_intervals:
+                if self.CanSelectPoint(l_index, index):
+                    area_indexes.add((l_index, index))
+                    if len(area_indexes) == self.num_forward_intervals:
                             break
+
+                # plato_index_l = self.known_values.iloc[l_index]["plato_index"]
+                # plato_index_r = self.known_values.iloc[index]["plato_index"]
+                #
+                # # Check if selected X points are not from plato region
+                # # and not marked as 'blocked'
+                # is_not_inside_plato = plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r)
+                # is_not_blocked = not self.known_values.iloc[l_index]["blocked"]
+                #
+                # if is_not_inside_plato and is_not_blocked:
+                #     xL = self.known_values.iloc[l_index]["X"]
+                #     xR = self.known_values.iloc[index]["X"]
+                #     dx = xR - xL
+                #
+                #     # Mark small interval (l_index, index) as blocked and skip its consideration
+                #     if abs(dx / minmax_delta) <= self.block_eps:
+                #         self.known_values.at[l_index, 'blocked'] = True
+                #     else:
+                #         area_indexes.add((l_index, index))
+                #         if len(area_indexes) == self.num_forward_intervals:
+                #             break
 
             if r_index < Y_sort.shape[0]:
-                plato_index_l = self.known_values.iloc[index]["plato_index"]
-                plato_index_r = self.known_values.iloc[r_index]["plato_index"]
-                if plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r):
-                    xL = self.known_values.iloc[index]["X"]
-                    xR = self.known_values.iloc[r_index]["X"]
-                    dx = xR - xL
-
-                    # Mark small interval (index, r_index) as blocked and skip its consideration
-                    if abs(dx / minmax_delta) <= self.min_interval_size_ratio:
-                        # self.known_values.iloc[index]["blocked"] = True
-                        self.known_values.at[index, 'blocked'] = True
-                    else:
-                        area_indexes.add((index, r_index))
-                        if len(area_indexes) == self.forward_intervals:
+                if self.CanSelectPoint(index, r_index):
+                    area_indexes.add((index, r_index))
+                    if len(area_indexes) == self.num_forward_intervals:
                             break
+
+
+                # plato_index_l = self.known_values.iloc[index]["plato_index"]
+                # plato_index_r = self.known_values.iloc[r_index]["plato_index"]
+                #
+                # # Check if selected X points are not from plato region
+                # # and not marked as 'blocked'
+                # is_not_inside_plato = plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r)
+                # is_not_blocked = not self.known_values.iloc[index]["blocked"]
+                #
+                # if is_not_inside_plato and is_not_blocked:
+                #     xL = self.known_values.iloc[index]["X"]
+                #     xR = self.known_values.iloc[r_index]["X"]
+                #     dx = xR - xL
+                #
+                #     # Mark small interval (index, r_index) as blocked and skip its consideration
+                #     if abs(dx / minmax_delta) <= self.block_eps:
+                #         self.known_values.at[index, 'blocked'] = True
+                #     else:
+                #         area_indexes.add((index, r_index))
+                #         if len(area_indexes) == self.num_forward_intervals:
+                #             break
 
         return area_indexes
 
 
     def CreateBackwardIntervalSet(self):
-        if (self.known_values.shape[0] - 1) < self.forward_intervals:
+        if (self.known_values.shape[0] - 1) < self.num_forward_intervals:
             # TODO: сделать проверку там где используется вывод на set empty
             return set()
 
         # Рассчитываем максимальное количество backward-интервалов которые можем рассмотреть
-        n_backwards_areas = (self.known_values.shape[0] - 1) - self.forward_intervals
+        n_backwards_areas = (self.known_values.shape[0] - 1) - self.num_forward_intervals
         n_backwards_areas = min(n_backwards_areas, self.backward_intervals)
         if n_backwards_areas <= 0:
             return set()
@@ -179,51 +199,81 @@ class CustomOptimizer:
         Y_sort = Y_sort[(Y_sort["plato_index"] == -1) | (Y_sort["plato_edge"] == True)]
 
         area_indexes = set()
-        minmax_delta = (self.maxs[0] - self.mins[0])
+        # minmax_delta = (self.maxs[0] - self.mins[0])
 
         for row in Y_sort.iterrows():
             index = int(row[0])
             l_index = index - 1
             r_index = index + 1
 
-            # if l_index < 0 or r_index >= Y_sort.shape[0]:
-            #     continue
 
             if l_index >= 0:
-                # Mark small interval (l_index, index) as blocked and skip its consideration
-                plato_index_l = self.known_values.iloc[l_index]["plato_index"]
-                plato_index_r = self.known_values.iloc[index]["plato_index"]
-                if plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r):
-                    xL = self.known_values.iloc[l_index]["X"]
-                    xR = self.known_values.iloc[index]["X"]
-                    dx = xR - xL
-                    if abs(dx / minmax_delta) <= self.min_interval_size_ratio:
-                        # self.known_values.iloc[l_index]["blocked"] = True
-                        self.known_values.at[l_index, 'blocked'] = True
-                    else:
-                        area_indexes.add((l_index, index))
-                        if len(area_indexes) == self.backward_intervals:
-                            break
+                if self.CanSelectPoint(l_index, index):
+                    area_indexes.add((l_index, index))
+                    if len(area_indexes) == self.backward_intervals:
+                        break
+
+                # # Mark small interval (l_index, index) as blocked and skip its consideration
+                # plato_index_l = self.known_values.iloc[l_index]["plato_index"]
+                # plato_index_r = self.known_values.iloc[index]["plato_index"]
+                # if plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r):
+                #     xL = self.known_values.iloc[l_index]["X"]
+                #     xR = self.known_values.iloc[index]["X"]
+                #     dx = xR - xL
+                #     if abs(dx / minmax_delta) <= self.block_eps:
+                #         # self.known_values.iloc[l_index]["blocked"] = True
+                #         self.known_values.at[l_index, 'blocked'] = True
+                #     else:
+                #         area_indexes.add((l_index, index))
+                #         if len(area_indexes) == self.backward_intervals:
+                #             break
 
             if r_index < Y_sort.shape[0]:
-                # Mark small interval (index, r_index) as blocked and skip its consideration
-                plato_index_l = self.known_values.iloc[index]["plato_index"]
-                plato_index_r = self.known_values.iloc[r_index]["plato_index"]
-                if plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r):
-                    xL = self.known_values.iloc[index]["X"]
-                    xR = self.known_values.iloc[r_index]["X"]
-                    dx = xR - xL
-                    if abs(dx / minmax_delta) <= self.min_interval_size_ratio:
-                        # self.known_values.iloc[index]["blocked"] = True
-                        self.known_values.at[index, 'blocked'] = True
-                    else:
-                        area_indexes.add((index, r_index))
-                        if len(area_indexes) == self.backward_intervals:
-                            break
+                if self.CanSelectPoint(index, r_index):
+                    area_indexes.add((index, r_index))
+                    if len(area_indexes) == self.backward_intervals:
+                        break
+
+
+                # # Mark small interval (index, r_index) as blocked and skip its consideration
+                # plato_index_l = self.known_values.iloc[index]["plato_index"]
+                # plato_index_r = self.known_values.iloc[r_index]["plato_index"]
+                # if plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r):
+                #     xL = self.known_values.iloc[index]["X"]
+                #     xR = self.known_values.iloc[r_index]["X"]
+                #     dx = xR - xL
+                #     if abs(dx / minmax_delta) <= self.block_eps:
+                #         # self.known_values.iloc[index]["blocked"] = True
+                #         self.known_values.at[index, 'blocked'] = True
+                #     else:
+                #         area_indexes.add((index, r_index))
+                #         if len(area_indexes) == self.backward_intervals:
+                #             break
 
         return area_indexes
 
 
+
+    def CanSelectPoint(self, l_index: int, r_index: int) -> bool:
+        plato_index_l = self.known_values.iloc[l_index]["plato_index"]
+        plato_index_r = self.known_values.iloc[r_index]["plato_index"]
+
+        # Check if selected X points are not from plato region
+        # and not marked as 'blocked'
+        is_not_inside_plato = plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r)
+        is_not_blocked = not self.known_values.iloc[l_index]["blocked"]
+
+        if is_not_inside_plato and is_not_blocked:
+            xL = self.known_values.iloc[l_index]["X"]
+            xR = self.known_values.iloc[r_index]["X"]
+            dx = xR - xL
+
+            # Mark small interval (l_index, index) as blocked
+            if abs(dx) <= self.block_eps:
+                self.known_values.at[l_index, 'blocked'] = True
+            else:
+                return True
+        return False
 
 
 
@@ -263,7 +313,6 @@ class CustomOptimizer:
 
 
     def CreateProbePoints(self) -> list:
-        # num_probes = min(self.n_probes, len(self.u_coords))
         num_probes = self.n_probes
         assert num_probes > 0
 
@@ -349,10 +398,11 @@ class CustomOptimizer:
 
         backward_countdown = self.backward_fires_each_n
         plato_countdown = self.plato_fires_each_n
+
         for i in range(max_epochs):
-            if self.epochs == 0:
+            self.epochs += 1
+            if self.epochs == 1:
                 self.Warmup()
-                self.epochs += 1
             else:
 
                 # Check if it is a plato stage
@@ -373,7 +423,6 @@ class CustomOptimizer:
                     self.RunValues(new_X)
                     self.DebugPlot("plato")
 
-                    self.epochs += 1
                     self.plato_indexes = self.FindPlatoRegions()
                     self.MarkPlatoRegions()
                     continue
@@ -408,7 +457,6 @@ class CustomOptimizer:
                 self.RunValues(new_X)
                 self.DebugPlot(debug_name)
 
-                self.epochs += 1
                 self.plato_indexes = self.FindPlatoRegions()
                 self.MarkPlatoRegions()
 
@@ -424,9 +472,9 @@ class CustomOptimizer:
 
 
     def FindPlatoRegions(self):
-        plato_x_eps = 10.0     # TODO: min_max_delta , min_size_ratio ?
-        plato_dx_block = 2.0   # TODO: в процентах от X_min_max ?
-        plato_y_eps = 0.0001
+        # plato_x_eps = 10.0     # TODO: min_max_delta , min_size_ratio ?
+        # plato_dx_block = 2.0   # TODO: в процентах от X_min_max ?
+        # plato_y_eps = 0.0001
 
         # -----------------
         # reset plato before new recalculation
@@ -446,12 +494,12 @@ class CustomOptimizer:
             next_x = self.known_values.iloc[i + 1]["X"]
             next_y = self.known_values.iloc[i + 1]["Y"]
 
-            if abs(next_x - x) < plato_x_eps and abs(next_y - y) < plato_y_eps:
+            if abs(next_x - x) < self.plato_eps and abs(next_y - y) < self.plato_objective_eps:
                 if l_index < 0:
                     l_index = i
                 r_index = i
 
-                if abs(next_x - x) < plato_dx_block:
+                if abs(next_x - x) < self.plato_block_eps:
                     self.known_values.at[i - 1, 'plato_block'] = True
 
             else:
@@ -489,92 +537,6 @@ class CustomOptimizer:
         u_cursor = plato_module.UnitMapRegions()
         out_values = plato_module.UnmapValues(u_cursor)
         return out_values
-
-
-
-        # plato_regions = []
-        #
-        # sum_shapes = 0.0
-        # for p in plato_indexes:
-        #     l_index = p[0]
-        #     r_index = p[1]
-        #
-        #     # Select plato-region
-        #     region = self.known_values.iloc[l_index: r_index + 2]
-        #
-        #     # filter out "plato_block" rows
-        #     non_blocked = region[region["plato_block"] == False]
-        #
-        #     # saving original table index column to unmap values from it later
-        #     non_blocked["original_index"] = non_blocked.index
-        #     non_blocked.reset_index(inplace=True, drop=True)
-        #
-        #     plato_regions.append(non_blocked)
-        #     sum_shapes += non_blocked.shape[0]
-        #
-        #
-        # region_ucoords = dict()     # table index -> tuple(u_start, u_end)
-        # u_cursor = 0.0
-        # u_gap = 0.01
-        # for i, t in enumerate(plato_regions):
-        #     w = float(t.shape[0]) / sum_shapes
-        #     region_ucoords[i] = (u_cursor, u_cursor + w)
-        #     u_cursor += w + u_gap
-        #
-        #
-        # # u_pick - pick u-values and unmapping into real x values
-        # num_probes = self.n_probes
-        # assert num_probes > 0
-        # u_len = u_cursor - u_gap
-        # u_step = u_len / (num_probes + 1)
-        # out_X = []
-        # u_pick = u_step
-        #
-        # for i in range(num_probes):
-        #     u_potential_gap_hit = False
-        #
-        #     for k, u_coords in region_ucoords.items():
-        #         if u_potential_gap_hit:
-        #             if u_pick < u_coords[0]:
-        #                 u_pick = u_coords[0] + 0.01 * (u_coords[1] - u_coords[0])
-        #
-        #         if u_coords[0] <= u_pick <= u_coords[1]:
-        #             alpha = (u_pick - u_coords[0]) / (u_coords[1] - u_coords[0])
-        #             tgt_table = plato_regions[k]
-        #             idx_range = tgt_table.index
-        #             row_index = int(((idx_range.stop - 1) - idx_range.start) * alpha)
-        #
-        #             if row_index < tgt_table.shape[0] - 1:
-        #                 X_value = (tgt_table.iloc[row_index]["X"] + tgt_table.iloc[row_index + 1]["X"]) / 2.0
-        #
-        #             else:
-        #                 # TODO: если мы здесь - значит мы вышли за границы tgt_tables,
-        #                 #   а значит за пределы этого плато-региона
-        #
-        #                 unmapped_index = tgt_table.iloc[row_index]["original_index"]
-        #                 if unmapped_index < self.known_values.shape[0] - 1:
-        #                     X_l = self.known_values.iloc[unmapped_index]["X"]
-        #                     X_r = self.known_values.iloc[unmapped_index + 1]["X"]
-        #                     X_value = (X_l + X_r) / 2.0
-        #
-        #                 else:
-        #                     X_l = self.known_values.iloc[unmapped_index - 1]["X"]
-        #                     X_r = self.known_values.iloc[unmapped_index]["X"]
-        #                     X_value = (X_l + X_r) / 2.0
-        #
-        #             # TODO: Set ?
-        #             if X_value not in out_X:
-        #                 out_X.append(X_value)
-        #
-        #             break
-        #
-        #         else:
-        #             u_potential_gap_hit = True
-        #
-        #     u_pick += u_step
-        #
-        # return out_X
-
 
 
     def DebugPlot(self, prefix: str):

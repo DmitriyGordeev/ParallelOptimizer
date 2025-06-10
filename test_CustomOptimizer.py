@@ -67,9 +67,9 @@ class TestCustomOptimizer(TestCase):
 
 
     def test_RunCycle(self):
-        opt = CustomOptimizer(objective=const_func)
-        opt.squeeze_factor = 0.5
-        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=7)
+        opt = CustomOptimizer(objective=linear)
+        opt.squeeze_factor = 0.7
+        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=15)
 
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
