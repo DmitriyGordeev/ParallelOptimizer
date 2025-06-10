@@ -2,6 +2,8 @@ import enum
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plot
+
 
 
 class CustomOptimizer:
@@ -27,6 +29,12 @@ class CustomOptimizer:
 
         self.eps = 0.001
         self.min_interval_size_ratio = 0.01
+
+        # Debug --------------
+        self.debug_old_X = []
+        self.debug_old_Y = []
+        self.debug_new_X = []
+        self.debug_new_Y = []
 
 
 
@@ -272,6 +280,10 @@ class CustomOptimizer:
         assert len(values) > 0
         for x in values:
             y = self.objective(x)
+
+            self.debug_new_X.append(x)
+            self.debug_new_Y.append(y)
+
             self.internal_itr += 1
             self.known_values = self.known_values._append({
                 "X": x,
@@ -350,8 +362,12 @@ class CustomOptimizer:
                         print(f"no plato detected, skip plato iteration")
                         continue
                     new_X = self.GeneratePlatoPoints(self.plato_indexes)
+                    self.debug_old_X = self.known_values["X"].to_list()
+                    self.debug_old_Y = self.known_values["Y"].to_list()
 
                     self.RunValues(new_X)
+                    self.DebugPlot("plato")
+
                     self.epochs += 1
                     self.plato_indexes = self.FindPlatoRegions()
                     self.MarkPlatoRegions()
@@ -360,9 +376,11 @@ class CustomOptimizer:
                     plato_countdown -= 1
 
                 # Check if it is backward pass stage
+                debug_name = "forward"
                 is_forward = True
                 if backward_countdown == 0:
                     is_forward = False
+                    debug_name = "backward"
                     backward_countdown = self.backward_fires_each_n
                     print(f" >>> running backward iteration at epoch = {i}")
                 else:
@@ -379,7 +397,12 @@ class CustomOptimizer:
 
                 self.UnitMapping()
                 new_X = self.CreateProbePoints()
+                self.debug_old_X = self.known_values["X"].to_list()
+                self.debug_old_Y = self.known_values["Y"].to_list()
+
                 self.RunValues(new_X)
+                self.DebugPlot(debug_name)
+
                 self.epochs += 1
                 self.plato_indexes = self.FindPlatoRegions()
                 self.MarkPlatoRegions()
@@ -537,3 +560,17 @@ class CustomOptimizer:
             u_pick += u_step
 
         return out_X
+
+
+
+    def DebugPlot(self, prefix: str):
+        plot.plot(self.debug_old_X, self.debug_old_Y, 'g.')
+        plot.plot(self.debug_new_X, self.debug_new_Y, 'r.')
+        plot.grid()
+        plot.savefig(f'plots/{prefix}_{self.epochs}.png', bbox_inches='tight')
+        plot.close()
+
+        self.debug_old_X = []
+        self.debug_old_Y = []
+        self.debug_new_X = []
+        self.debug_new_Y = []

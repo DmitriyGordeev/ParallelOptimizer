@@ -60,9 +60,7 @@ class TestCustomOptimizer(TestCase):
         opt.MarkPlatoRegions()
 
 
-
         opt.SelectIntervals(forward=False)
-
 
 
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
@@ -75,7 +73,7 @@ class TestCustomOptimizer(TestCase):
     def test_RunCycle(self):
         opt = CustomOptimizer(objective=gaussian)
         opt.squeeze_factor = 0.5
-        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=6)
+        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=10)
 
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
@@ -222,3 +220,9 @@ class TestCustomOptimizer(TestCase):
 
         pass
 
+
+    def test_save_plot(self):
+        plot.plot([0, 1, 2], 'r.')
+        plot.plot([9, 3, 2], 'g.')
+        plot.grid()
+        plot.savefig('foo.png', bbox_inches='tight')
