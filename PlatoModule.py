@@ -46,7 +46,8 @@ class PlatoModule:
 
 
     # Transforms unit-space value into region table's index (u -> i)
-    def UnmapX(self, region: pd.DataFrame, u_pick: float, u_coords: tuple) -> float:
+    @staticmethod
+    def UnmapX(region: pd.DataFrame, u_pick: float, u_coords: tuple) -> float:
         alpha = (u_pick - u_coords[0]) / (u_coords[1] - u_coords[0])
         idx_range = region.index
         region_row = int(((idx_range.stop - 1) - idx_range.start) * alpha)
@@ -84,25 +85,7 @@ class PlatoModule:
                         u_pick = u_coords[0] + 0.01 * (u_coords[1] - u_coords[0])
 
                 if u_coords[0] <= u_pick <= u_coords[1]:
-
                     X_value = self.UnmapX(self.plato_regions[k], u_pick, u_coords)
-
-                    # # Transform unit-space value into region table's index (u -> i)
-                    # alpha = (u_pick - u_coords[0]) / (u_coords[1] - u_coords[0])
-                    # region_table = self.plato_regions[k]
-                    # idx_range = region_table.index
-                    # region_row = int(((idx_range.stop - 1) - idx_range.start) * alpha)
-                    #
-                    # if region_row < region_table.shape[0] - 1:
-                    #     X_l = region_table.iloc[region_row]["X"]
-                    #     X_r = region_table.iloc[region_row + 1]["X"]
-                    #     X_value = (X_l + X_r) / 2.0
-                    #
-                    # else:
-                    #     X_l = region_table.iloc[region_row - 1]["X"]
-                    #     X_r = region_table.iloc[region_row]["X"]
-                    #     X_value = (X_l + X_r) / 2.0
-
                     out_X.add(X_value)
                     break
 

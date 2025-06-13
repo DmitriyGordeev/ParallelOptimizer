@@ -28,10 +28,10 @@ class CustomOptimizer:
 
         self.plato_indexes = []
 
-        self.block_eps = 1.0
-        self.plato_eps = 10.0
-        self.plato_block_eps = 2.0
-        self.plato_objective_eps = 0.01
+        self.block_eps = 0.01
+        self.plato_X_eps = 10.0
+        self.plato_block_eps = 0.5
+        self.plato_Y_eps = 0.01
 
         # Debug --------------
         self.debug_old_X = []
@@ -124,54 +124,11 @@ class CustomOptimizer:
                     if len(area_indexes) == self.num_forward_intervals:
                             break
 
-                # plato_index_l = self.known_values.iloc[l_index]["plato_index"]
-                # plato_index_r = self.known_values.iloc[index]["plato_index"]
-                #
-                # # Check if selected X points are not from plato region
-                # # and not marked as 'blocked'
-                # is_not_inside_plato = plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r)
-                # is_not_blocked = not self.known_values.iloc[l_index]["blocked"]
-                #
-                # if is_not_inside_plato and is_not_blocked:
-                #     xL = self.known_values.iloc[l_index]["X"]
-                #     xR = self.known_values.iloc[index]["X"]
-                #     dx = xR - xL
-                #
-                #     # Mark small interval (l_index, index) as blocked and skip its consideration
-                #     if abs(dx / minmax_delta) <= self.block_eps:
-                #         self.known_values.at[l_index, 'blocked'] = True
-                #     else:
-                #         area_indexes.add((l_index, index))
-                #         if len(area_indexes) == self.num_forward_intervals:
-                #             break
-
             if r_index < Y_sort.shape[0]:
                 if self.CanSelectPoint(index, r_index):
                     area_indexes.add((index, r_index))
                     if len(area_indexes) == self.num_forward_intervals:
                             break
-
-
-                # plato_index_l = self.known_values.iloc[index]["plato_index"]
-                # plato_index_r = self.known_values.iloc[r_index]["plato_index"]
-                #
-                # # Check if selected X points are not from plato region
-                # # and not marked as 'blocked'
-                # is_not_inside_plato = plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r)
-                # is_not_blocked = not self.known_values.iloc[index]["blocked"]
-                #
-                # if is_not_inside_plato and is_not_blocked:
-                #     xL = self.known_values.iloc[index]["X"]
-                #     xR = self.known_values.iloc[r_index]["X"]
-                #     dx = xR - xL
-                #
-                #     # Mark small interval (index, r_index) as blocked and skip its consideration
-                #     if abs(dx / minmax_delta) <= self.block_eps:
-                #         self.known_values.at[index, 'blocked'] = True
-                #     else:
-                #         area_indexes.add((index, r_index))
-                #         if len(area_indexes) == self.num_forward_intervals:
-                #             break
 
         return area_indexes
 
@@ -213,42 +170,11 @@ class CustomOptimizer:
                     if len(area_indexes) == self.backward_intervals:
                         break
 
-                # # Mark small interval (l_index, index) as blocked and skip its consideration
-                # plato_index_l = self.known_values.iloc[l_index]["plato_index"]
-                # plato_index_r = self.known_values.iloc[index]["plato_index"]
-                # if plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r):
-                #     xL = self.known_values.iloc[l_index]["X"]
-                #     xR = self.known_values.iloc[index]["X"]
-                #     dx = xR - xL
-                #     if abs(dx / minmax_delta) <= self.block_eps:
-                #         # self.known_values.iloc[l_index]["blocked"] = True
-                #         self.known_values.at[l_index, 'blocked'] = True
-                #     else:
-                #         area_indexes.add((l_index, index))
-                #         if len(area_indexes) == self.backward_intervals:
-                #             break
-
             if r_index < Y_sort.shape[0]:
                 if self.CanSelectPoint(index, r_index):
                     area_indexes.add((index, r_index))
                     if len(area_indexes) == self.backward_intervals:
                         break
-
-
-                # # Mark small interval (index, r_index) as blocked and skip its consideration
-                # plato_index_l = self.known_values.iloc[index]["plato_index"]
-                # plato_index_r = self.known_values.iloc[r_index]["plato_index"]
-                # if plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r):
-                #     xL = self.known_values.iloc[index]["X"]
-                #     xR = self.known_values.iloc[r_index]["X"]
-                #     dx = xR - xL
-                #     if abs(dx / minmax_delta) <= self.block_eps:
-                #         # self.known_values.iloc[index]["blocked"] = True
-                #         self.known_values.at[index, 'blocked'] = True
-                #     else:
-                #         area_indexes.add((index, r_index))
-                #         if len(area_indexes) == self.backward_intervals:
-                #             break
 
         return area_indexes
 
@@ -329,12 +255,10 @@ class CustomOptimizer:
     def RunValues(self, values: list):
         assert len(values) > 0
         for x in values:
-            y = self.objective(x)
-
+            y = self.RunObjective(x)
             self.debug_new_X.append(x)
             self.debug_new_Y.append(y)
 
-            self.internal_itr += 1
             self.known_values = self.known_values._append({
                 "X": x,
                 "Y": y,
@@ -348,11 +272,16 @@ class CustomOptimizer:
         pass
 
 
+    def RunObjective(self, x: float) -> float:
+        self.internal_itr += 1
+        return self.objective(x)
+
 
     def Warmup(self):
         # TODO: обобщить на вектор параметров:
+        # TODO: сделать параллельный проход если доступно более 1 воркера
 
-        y = self.objective(self.mins[0])
+        y = self.RunObjective(self.mins[0])
         self.known_values = self.known_values._append({
             "X": self.mins[0],
             "Y": y,
@@ -362,7 +291,7 @@ class CustomOptimizer:
             "plato_edge": False,
         }, ignore_index=True)
 
-        y = self.objective(self.maxs[0])
+        y = self.RunObjective(self.maxs[0])
         self.known_values = self.known_values._append({
             "X": self.maxs[0],
             "Y": y,
@@ -373,7 +302,7 @@ class CustomOptimizer:
         }, ignore_index=True)
 
         middle = (self.mins[0] + self.maxs[0]) / 2.0
-        y = self.objective(middle)
+        y = self.RunObjective(middle)
         self.known_values = self.known_values._append({
             "X": middle,
             "Y": y,
@@ -383,8 +312,6 @@ class CustomOptimizer:
             "plato_edge": False,
         }, ignore_index=True)
 
-        # TODO: засунуть в функцию к self.objective(...) и вызывать вместе
-        self.internal_itr += 3
         self.known_values = self.known_values.sort_values(by="X")
         self.known_values.reset_index(inplace=True, drop=True)
 
@@ -472,11 +399,6 @@ class CustomOptimizer:
 
 
     def FindPlatoRegions(self):
-        # plato_x_eps = 10.0     # TODO: min_max_delta , min_size_ratio ?
-        # plato_dx_block = 2.0   # TODO: в процентах от X_min_max ?
-        # plato_y_eps = 0.0001
-
-        # -----------------
         # reset plato before new recalculation
         self.known_values.loc[:, "plato_index"] = -1
         self.known_values.loc[:, "plato_edge"] = False
@@ -494,7 +416,7 @@ class CustomOptimizer:
             next_x = self.known_values.iloc[i + 1]["X"]
             next_y = self.known_values.iloc[i + 1]["Y"]
 
-            if abs(next_x - x) < self.plato_eps and abs(next_y - y) < self.plato_objective_eps:
+            if abs(next_x - x) < self.plato_X_eps and abs(next_y - y) < self.plato_Y_eps:
                 if l_index < 0:
                     l_index = i
                 r_index = i
@@ -539,11 +461,11 @@ class CustomOptimizer:
         return out_values
 
 
-    def DebugPlot(self, prefix: str):
+    def DebugPlot(self, run_name: str):
         plot.plot(self.debug_old_X, self.debug_old_Y, 'g.')
         plot.plot(self.debug_new_X, self.debug_new_Y, 'r.')
         plot.grid()
-        plot.savefig(f'plots/{prefix}_{self.epochs}.png', bbox_inches='tight')
+        plot.savefig(f'plots/epoch_{self.epochs}_{run_name}.png', bbox_inches='tight')
         plot.close()
 
         self.debug_old_X = []
