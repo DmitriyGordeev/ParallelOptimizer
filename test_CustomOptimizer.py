@@ -1,3 +1,4 @@
+from random import random
 from unittest import TestCase
 from CustomOptimizer import CustomOptimizer
 import pandas as pd
@@ -69,7 +70,7 @@ class TestCustomOptimizer(TestCase):
     def test_RunCycle(self):
         opt = CustomOptimizer(objective=gaussian)
         opt.squeeze_factor = 0.7
-        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=20)
+        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=9)
 
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
@@ -181,8 +182,80 @@ class TestCustomOptimizer(TestCase):
 
 
 
-    def test_save_plot(self):
-        plot.plot([0, 1, 2], 'r.')
-        plot.plot([9, 3, 2], 'g.')
-        plot.grid()
-        plot.savefig('foo.png', bbox_inches='tight')
+
+    def test_SecondaryAxisExperiment(self):
+        data = pd.read_csv("debug_values_5.csv")
+        opt = CustomOptimizer(objective=const_func)
+        opt.known_values = data
+        opt.mins = [0]
+        opt.maxs = [100]
+
+        # TODO: собрать искуственную функцию с плато и сделать 1D тест
+
+        Y_sort = opt.known_values.sample(frac=1)
+        Y_sort = opt.known_values.sort_values(by="Y", ascending=False, kind='stable')
+
+        # filter rows
+        Y_sort = Y_sort[Y_sort["blocked"] == False]
+        Y_sort = Y_sort[(Y_sort["plato_index"] == -1) | (Y_sort["plato_edge"] == True)]
+
+        Y_max = float(Y_sort.iloc[0]["Y"])
+        Y_min = float(Y_sort.iloc[-1]["Y"])
+
+        Y_range = Y_max - Y_min
+
+        Y_sort["w"] = [1.0 / Y_sort.shape[0]] * Y_sort.shape[0]
+        if Y_range != 0.0:
+            Y_sort["w"] += (Y_sort["Y"] - Y_min) / (Y_max - Y_min)
+            wsum = Y_sort["w"].sum()
+            Y_sort["w"] /= wsum
+
+
+        # Find lerp value from toss
+        # toss = random()
+        toss = 0.5
+        w_accum = 0.0
+        index = -1
+        for i in range(Y_sort.shape[0]):
+            w_accum += Y_sort.iloc[i]["w"]
+            if toss <= w_accum:
+                index = i
+                break
+
+        u_start = w_accum - Y_sort.iloc[index]["w"]
+        u_end = w_accum
+        lerp = (toss - u_start) / (u_end - u_start)
+
+        pick_index = Y_sort.index[index]
+        X_current = data.loc[pick_index, "X"]
+
+
+        # Выбор одной из соседних точек --------------------------------
+        side_toss = 0.4
+        next_point = False
+        if side_toss < 0.5:
+            adjacent_index = pick_index - 1
+            adj_row = data.iloc[adjacent_index]
+            exclude_condition_1 = adj_row["blocked"]
+            exclude_condition_2 = adj_row["plato_index"] != -1 and not adj_row["plato_edge"]
+            exclude_condition_3 = adj_row["plato_block"]
+
+            if exclude_condition_1 or exclude_condition_2 or exclude_condition_3:
+                next_point = True
+            else:
+                X_adjacent = adj_row["X"]
+        else:
+            next_point = True
+
+        if next_point:
+            adjacent_index = pick_index + 1
+            X_adjacent = data.loc[adjacent_index, "X"]
+
+
+        # Выбор новой точки исходя из lerp - значения между соседними
+        X_out = X_current + (X_adjacent - X_current) * lerp
+
+
+        pass
+
+

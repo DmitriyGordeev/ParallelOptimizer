@@ -369,7 +369,7 @@ class CustomOptimizer:
 
                 if not self.SelectIntervals(is_forward):
                     if len(self.plato_indexes) > 0:
-                        print(f" ------ only plato regions left at this moment, continue with plato run")
+                        print(f"Only plato regions left at this moment, continue with plato run")
                         plato_countdown = 0
                         continue
                     else:
