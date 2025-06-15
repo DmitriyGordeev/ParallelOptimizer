@@ -27,6 +27,13 @@ def gaussian(x):
     )
 
 
+
+def pow2_plato(x):
+    if 20 <= x <= 80:
+        return (x - 50) * (x - 50)
+    return 1000.0
+
+
 class TestCustomOptimizer(TestCase):
     def test_general(self):
         opt = CustomOptimizer(objective=const_func)
@@ -68,9 +75,9 @@ class TestCustomOptimizer(TestCase):
 
 
     def test_RunCycle(self):
-        opt = CustomOptimizer(objective=gaussian)
-        opt.squeeze_factor = 0.7
-        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=9)
+        opt = CustomOptimizer(objective=pow2_plato)
+        opt.squeeze_factor = 0.5
+        opt.RunCycle(names=["X"], mins=[0], maxs=[100], max_epochs=20)
 
         plot.plot(opt.known_values["X"], opt.known_values["Y"], 'g.')
         plot.grid()
@@ -189,8 +196,6 @@ class TestCustomOptimizer(TestCase):
         opt.known_values = data
         opt.mins = [0]
         opt.maxs = [100]
-
-        # TODO: собрать искуственную функцию с плато и сделать 1D тест
 
         Y_sort = opt.known_values.sample(frac=1)
         Y_sort = opt.known_values.sort_values(by="Y", ascending=False, kind='stable')

@@ -312,6 +312,9 @@ class CustomOptimizer:
             "plato_edge": False,
         }, ignore_index=True)
 
+        self.debug_new_X = self.known_values["X"].to_list()
+        self.debug_new_Y = self.known_values["Y"].to_list()
+
         self.known_values = self.known_values.sort_values(by="X")
         self.known_values.reset_index(inplace=True, drop=True)
 
@@ -330,6 +333,7 @@ class CustomOptimizer:
             self.epochs += 1
             if self.epochs == 1:
                 self.Warmup()
+                self.DebugPlot("warmup")
             else:
 
                 # Check if it is a plato stage
