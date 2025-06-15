@@ -279,7 +279,7 @@ class CustomOptimizer:
 
     def Warmup(self):
         # TODO: обобщить на вектор параметров:
-        # TODO: сделать параллельный проход если доступно более 1 воркера
+        # TODO: сделать параллельный Warmup если доступно более 1 воркера
 
         y = self.RunObjective(self.mins[0])
         self.known_values = self.known_values._append({

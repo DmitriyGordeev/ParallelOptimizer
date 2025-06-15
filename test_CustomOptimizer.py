@@ -200,15 +200,14 @@ class TestCustomOptimizer(TestCase):
         Y_sort = opt.known_values.sample(frac=1)
         Y_sort = opt.known_values.sort_values(by="Y", ascending=False, kind='stable')
 
-        # filter rows
-        Y_sort = Y_sort[Y_sort["blocked"] == False]
-        Y_sort = Y_sort[(Y_sort["plato_index"] == -1) | (Y_sort["plato_edge"] == True)]
+        # # filter rows
+        # Y_sort = Y_sort[Y_sort["blocked"] == False]
+        # Y_sort = Y_sort[(Y_sort["plato_index"] == -1) | (Y_sort["plato_edge"] == True)]
 
         Y_max = float(Y_sort.iloc[0]["Y"])
         Y_min = float(Y_sort.iloc[-1]["Y"])
 
         Y_range = Y_max - Y_min
-
         Y_sort["w"] = [1.0 / Y_sort.shape[0]] * Y_sort.shape[0]
         if Y_range != 0.0:
             Y_sort["w"] += (Y_sort["Y"] - Y_min) / (Y_max - Y_min)
@@ -218,7 +217,7 @@ class TestCustomOptimizer(TestCase):
 
         # Find lerp value from toss
         # toss = random()
-        toss = 0.5
+        toss = 0.99
         w_accum = 0.0
         index = -1
         for i in range(Y_sort.shape[0]):
@@ -235,32 +234,53 @@ class TestCustomOptimizer(TestCase):
         X_current = data.loc[pick_index, "X"]
 
 
-        # Выбор одной из соседних точек --------------------------------
+        # # Выбор одной из соседних точек --------------------------------
+        # side_toss = 0.4
+        # next_point = False
+        # if side_toss < 0.5:
+        #     adjacent_index = pick_index - 1
+        #     adj_row = data.iloc[adjacent_index]
+        #     exclude_condition_1 = adj_row["blocked"]
+        #     exclude_condition_2 = adj_row["plato_index"] != -1 and not adj_row["plato_edge"]
+        #     exclude_condition_3 = adj_row["plato_block"]
+        #
+        #     if exclude_condition_1 or exclude_condition_2 or exclude_condition_3:
+        #         next_point = True
+        #     else:
+        #         X_adjacent = adj_row["X"]
+        # else:
+        #     next_point = True
+        #
+        # if next_point:
+        #     adjacent_index = pick_index + 1
+        #     X_adjacent = data.loc[adjacent_index, "X"]
+
+
         side_toss = 0.4
         next_point = False
-        if side_toss < 0.5:
+        if side_toss < 0.5 or pick_index == data.shape[0] - 1:
             adjacent_index = pick_index - 1
-            adj_row = data.iloc[adjacent_index]
-            exclude_condition_1 = adj_row["blocked"]
-            exclude_condition_2 = adj_row["plato_index"] != -1 and not adj_row["plato_edge"]
-            exclude_condition_3 = adj_row["plato_block"]
-
-            if exclude_condition_1 or exclude_condition_2 or exclude_condition_3:
+            if adjacent_index < 0:
                 next_point = True
             else:
-                X_adjacent = adj_row["X"]
+                X_adjacent = data.iloc[adjacent_index]["X"]
+
         else:
             next_point = True
 
+
         if next_point:
             adjacent_index = pick_index + 1
-            X_adjacent = data.loc[adjacent_index, "X"]
+            X_adjacent = data.iloc[adjacent_index]["X"]
 
 
         # Выбор новой точки исходя из lerp - значения между соседними
         X_out = X_current + (X_adjacent - X_current) * lerp
 
-
         pass
+
+
+
+
 
 
