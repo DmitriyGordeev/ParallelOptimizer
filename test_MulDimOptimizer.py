@@ -88,3 +88,31 @@ class TestMulDimOptimizer(TestCase):
         pass
 
 
+
+    def test_GeneratePoints(self):
+        data = pd.read_csv("debug_values_mul_dim_0.csv")
+        opt = MulDimOptimizer(foo2D)
+        opt.known_values = data
+
+        opt.mins = [0, 0]
+        opt.maxs = [100, 100]
+        opt.names = ["X1", "X2"]
+        opt.major_axis = 0
+
+        x_matrix = opt.GeneratePoints()
+        opt.RunValues(x_matrix)
+
+        x_matrix = opt.GeneratePoints()
+        opt.RunValues(x_matrix)
+        pass
+
+
+    def test_Warmup(self):
+        opt = MulDimOptimizer(foo2D)
+
+        opt.mins = [0, 20]
+        opt.maxs = [100, 80]
+        opt.names = ["X1", "X2"]
+
+        opt.CreateTable()
+        opt.Warmup()

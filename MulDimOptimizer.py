@@ -334,7 +334,7 @@ class MulDimOptimizer:
 
 
     """ returns matrix (n-axes x m-points) of new coords for objective to run """
-    def GeneratePoints(self, is_forward: bool) -> np.array:
+    def GeneratePoints(self, is_forward=True) -> np.array:
         # предполагаем что на данный момент уже выбрана major_axis из предыдущей итерации
 
         major_values = self.SelectMajorAxisPoints(is_forward)
@@ -358,6 +358,20 @@ class MulDimOptimizer:
             assert len(axis_values) == len(major_values)
             out_matrix[i] = axis_values
         return np.array(out_matrix)
+
+
+
+    def Warmup(self):
+        # TODO: можно сделать случайным:
+        self.major_axis = 0
+
+        x_warmup = np.zeros([len(self.mins), 3])
+        for axis_index in range(len(self.mins)):
+            x_warmup[axis_index, 0] = self.mins[axis_index]
+            x_warmup[axis_index, 1] = (self.mins[axis_index] + self.maxs[axis_index]) / 2.0
+            x_warmup[axis_index, 2] = self.maxs[axis_index]
+
+        self.RunValues(x_warmup)
 
 
 
