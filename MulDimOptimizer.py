@@ -1,3 +1,5 @@
+from random import random
+
 import pandas as pd
 import numpy as np
 
@@ -20,6 +22,7 @@ class MulDimOptimizer:
         self.names = []
         self.mins = []
         self.maxs = []
+        self.major_axis = -1
 
         self.plato_indexes = []
 
@@ -42,17 +45,319 @@ class MulDimOptimizer:
         # TODO: сделать так, чтобы Y не повторялся в названиях колонок, если одна из переменных тоже названа также
         columns = self.names + ["Y", "blocked", "plato_block", "plato_index", "plato_edge"]
         self.known_values = pd.DataFrame(columns=columns)
+        self.major_axis = 0
+
+
+
+    def SelectIntervals(self, forward=True) -> bool:
+        min_y = self.known_values["Y"].min()
+        max_y = self.known_values["Y"].max()
+
+        # cleanup values from previous run
+        self.major_axis_intervals = self.major_axis_intervals.drop(self.major_axis_intervals.index)
+
+        assert self.major_axis >= 0
+
+        major_column = self.known_values.columns[self.major_axis]
+        X = self.known_values[major_column].to_numpy()
+        Y = self.known_values["Y"].to_numpy()
+
+        if forward:
+            areas = self.CreateIntervalSet()
+        else:
+            areas = self.CreateBackwardIntervalSet()
+
+        if len(areas) == 0:
+            return False
+
+        sum_cost = 0
+        for pair in areas:
+            iL = pair[0]
+            iR = pair[1]
+
+            dx = X[iR] - X[iL]
+            mid_point = (X[iR] + X[iL]) / 2
+            x0 = mid_point - dx * self.squeeze_factor / 2
+            x1 = mid_point + dx * self.squeeze_factor / 2
+
+            # TODO: сделать параметром eps (0.0001) -
+            #  точность, при которой в наших масштабах
+            #  мы считаем значения равными везде в оптимайзере?
+            if max_y - min_y <= 0.00001:
+                y1_cost = 1.0
+                y2_cost = 1.0
+            else:
+                y1_cost = (Y[iL] - min_y) / (max_y - min_y) + 0.1
+                y2_cost = (Y[iR] - min_y) / (max_y - min_y) + 0.1
+            sum_cost += y1_cost + y2_cost
+
+            self.major_axis_intervals = self.major_axis_intervals._append({
+                "x0": x0,
+                "x1": x1,
+                "cost": y1_cost + y2_cost
+            }, ignore_index=True)
+
+        # rescale weights
+        self.major_axis_intervals["cost"] = self.major_axis_intervals["cost"] / sum_cost
+        assert abs(self.major_axis_intervals["cost"].sum() - 1.0) <= 0.00001  # не eps!
+        self.major_axis_intervals = self.major_axis_intervals.sample(frac=1)
+
+        sort_order_ascending = True
+        if forward:
+            sort_order_ascending = False
+        self.major_axis_intervals = self.major_axis_intervals.sort_values(by="cost", ascending=sort_order_ascending, kind='stable')
+        return True
 
 
 
 
-    def SelectIntervals(self):
-        # TODO: отсортировать по major X в порядке возрастания
-        pass
+    def CreateIntervalSet(self):
+        Y_sort = self.known_values.sample(frac=1)
+        Y_sort = Y_sort.sort_values(by="Y", ascending=False, kind='stable')
+
+        # select only from non-blocked intervals
+        Y_sort = Y_sort[Y_sort["blocked"] == False]
+
+        # Also filter out potential plato regions
+        Y_sort = Y_sort[(Y_sort["plato_index"] == -1) | (Y_sort["plato_edge"] == True)]
+
+        area_indexes = set()
+        # minmax_delta = (self.maxs[0] - self.mins[0])
+
+        for row in Y_sort.iterrows():
+            index = int(row[0])
+            l_index = index - 1
+            r_index = index + 1
+
+            if l_index >= 0:
+                if self.CanSelectPoint(l_index, index):
+                    area_indexes.add((l_index, index))
+                    if len(area_indexes) == self.num_forward_intervals:
+                            break
+
+            if r_index < Y_sort.shape[0]:
+                if self.CanSelectPoint(index, r_index):
+                    area_indexes.add((index, r_index))
+                    if len(area_indexes) == self.num_forward_intervals:
+                            break
+
+        return area_indexes
+
+
+    def CreateBackwardIntervalSet(self):
+        if (self.known_values.shape[0] - 1) < self.num_forward_intervals:
+            # TODO: сделать проверку там где используется вывод на set empty
+            return set()
+
+        # Рассчитываем максимальное количество backward-интервалов которые можем рассмотреть
+        n_backwards_areas = (self.known_values.shape[0] - 1) - self.num_forward_intervals
+        n_backwards_areas = min(n_backwards_areas, self.backward_intervals)
+        if n_backwards_areas <= 0:
+            return set()
+
+        # Перемешиваем, чтобы не создавать преференцию по X
+        # и сортриуем в обратном порядке нежели чем в CreateIntervalSet()
+        Y_sort = self.known_values.sample(frac=1)
+        Y_sort = Y_sort.sort_values(by="Y", ascending=True, kind='stable')
+
+        # select only from non-blocked intervals
+        Y_sort = Y_sort[Y_sort["blocked"] == False]
+
+        # Also filter out potential plato regions
+        Y_sort = Y_sort[(Y_sort["plato_index"] == -1) | (Y_sort["plato_edge"] == True)]
+
+        area_indexes = set()
+        # minmax_delta = (self.maxs[0] - self.mins[0])
+
+        for row in Y_sort.iterrows():
+            index = int(row[0])
+            l_index = index - 1
+            r_index = index + 1
+
+            if l_index >= 0:
+                if self.CanSelectPoint(l_index, index):
+                    area_indexes.add((l_index, index))
+                    if len(area_indexes) == self.backward_intervals:
+                        break
+
+            if r_index < Y_sort.shape[0]:
+                if self.CanSelectPoint(index, r_index):
+                    area_indexes.add((index, r_index))
+                    if len(area_indexes) == self.backward_intervals:
+                        break
+
+        return area_indexes
+
+
+
+    def CanSelectPoint(self, l_index: int, r_index: int) -> bool:
+        plato_index_l = self.known_values.iloc[l_index]["plato_index"]
+        plato_index_r = self.known_values.iloc[r_index]["plato_index"]
+
+        # Check if selected X points are not from plato region
+        # and not marked as 'blocked'
+        is_not_inside_plato = plato_index_l == -1 or plato_index_r == -1 or (plato_index_l != plato_index_r)
+        is_not_blocked = not self.known_values.iloc[l_index]["blocked"]
+
+        major_column = self.known_values.columns[self.major_axis]
+        if is_not_inside_plato and is_not_blocked:
+            xL = self.known_values.iloc[l_index][major_column]
+            xR = self.known_values.iloc[r_index][major_column]
+            dx = xR - xL
+
+            # Mark small interval (l_index, index) as blocked
+            if abs(dx) <= self.block_eps:
+                self.known_values.at[l_index, 'blocked'] = True
+            else:
+                return True
+        return False
+
+
+    def UnitMapping(self):
+        # Placing on unit-len:
+        u_coords = []
+        u_cursor = 0.0
+        u_gap = 0.01
+        for row in self.major_axis_intervals.iterrows():
+            item = row[1]
+            w = item["cost"]
+            u_coords.append((u_cursor, u_cursor + w))
+            u_cursor += w + u_gap
+        self.u_coords.clear()
+        self.u_coords = u_coords
+
+
+    def UnmapValue(self, u_pick: float) -> float:
+        # Unmapping picked values
+        gap_hit = False
+        X_unmapped = 0.0
+        for i, u_pair in enumerate(self.u_coords):
+            if gap_hit:
+                if u_pick < u_pair[0]:
+                    u_pick = u_pair[0] + 0.01 * (u_pair[1] - u_pair[0])
+
+            if u_pair[0] <= u_pick <= u_pair[1]:
+                alpha = (u_pick - u_pair[0]) / (u_pair[1] - u_pair[0])
+                x0 = self.major_axis_intervals.iloc[i]["x0"]
+                x1 = self.major_axis_intervals.iloc[i]["x1"]
+                X_unmapped = x0 + (x1 - x0) * alpha
+                break
+
+            else:
+                gap_hit = True
+        return X_unmapped
+
+
+
+    def CreateProbePoints(self) -> list:
+        num_probes = self.n_probes
+        assert num_probes > 0
+
+        u_len = self.u_coords[-1][1]
+        u_step = u_len / (num_probes + 1)
+        out = [0.0] * num_probes
+        u_pick = u_step
+        for i in range(num_probes):
+            out[i] = self.UnmapValue(u_pick)
+            u_pick += u_step
+        return out
+
+
+
+    def SelectMajorAxisPoints(self, is_forward: bool) -> list:
+        if not self.SelectIntervals(is_forward):
+            # TODO:
+            pass
+
+        self.UnitMapping()
+        new_X = self.CreateProbePoints()
+        return new_X
+
+
+    def SelectSinglePointOnMinorAxis(self, axis: int) -> float:
+        assert 0 <= axis < len(self.mins)
+        assert axis != self.major_axis
+        axis = self.known_values.columns[axis]
+
+        Y_sort = self.known_values.sample(frac=1)
+        Y_sort = Y_sort.sort_values(by="Y", ascending=False, kind='stable')
+        Y_max = float(Y_sort.iloc[0]["Y"])
+        Y_min = float(Y_sort.iloc[-1]["Y"])
+
+        Y_range = Y_max - Y_min
+        Y_sort["w"] = [1.0 / Y_sort.shape[0]] * Y_sort.shape[0]
+        if Y_range != 0.0:
+            Y_sort["w"] += (Y_sort["Y"] - Y_min) / (Y_max - Y_min)
+            wsum = Y_sort["w"].sum()
+            Y_sort["w"] /= wsum
+
+        # Find lerp value from toss
+        toss = random()
+        # toss = 0.99
+        w_accum = 0.0
+        index = -1
+        for i in range(Y_sort.shape[0]):
+            w_accum += Y_sort.iloc[i]["w"]
+            if toss <= w_accum:
+                index = i
+                break
+
+        u_start = w_accum - Y_sort.iloc[index]["w"]
+        u_end = w_accum
+        lerp = (toss - u_start) / (u_end - u_start)
+
+        pick_index = Y_sort.index[index]
+        X_current = self.known_values.loc[pick_index, axis]
+
+        # случайно выбираем предыдущую или следующую точку как примыкающую
+        side_toss = random()
+        next_point = False
+        if side_toss < 0.5 or pick_index == self.known_values.shape[0] - 1:
+            adjacent_index = pick_index - 1
+            if adjacent_index < 0:
+                next_point = True
+            else:
+                X_adjacent = self.known_values.iloc[adjacent_index][axis]
+
+        else:
+            next_point = True
+
+        if next_point:
+            adjacent_index = pick_index + 1
+            X_adjacent = self.known_values.iloc[adjacent_index][axis]
+
+        # Выбор новой точки исходя из lerp - значения между соседними
+        X_out = X_current + (X_adjacent - X_current) * lerp
+        return X_out
 
 
 
 
+    """ returns matrix (n-axes x m-points) of new coords for objective to run """
+    def GeneratePoints(self, is_forward: bool) -> np.array:
+        # предполагаем что на данный момент уже выбрана major_axis из предыдущей итерации
+
+        major_values = self.SelectMajorAxisPoints(is_forward)
+        num_points = len(major_values)
+
+        out_matrix = [[0] * len(major_values)] * len(self.mins)
+        out_matrix[self.major_axis] = major_values
+
+        # идем по остальным осям и берем значения
+        for i in range(len(self.mins)):
+            if i == self.major_axis:
+                # пропускаем major axis так как уже добавлен
+                continue
+
+            axis_values = []
+            for j in range(num_points):
+                value = self.SelectSinglePointOnMinorAxis(i)
+                axis_values.append(value)
+                # TODO: проверить что значения в axis_values не повторяются
+
+            assert len(axis_values) == len(major_values)
+            out_matrix[i] = axis_values
+        return np.array(out_matrix)
 
 
 
@@ -84,8 +389,15 @@ class MulDimOptimizer:
 
             self.known_values = self.known_values._append(result_dict, ignore_index=True)
 
-        # self.known_values = self.known_values.sort_values(by="X")
-        # self.known_values.reset_index(inplace=True, drop=True)
+        # Переход на следующую major_axis
+        self.major_axis += 1
+        if self.major_axis == len(self.mins):
+            self.major_axis = 0
+
+        # Сортировка и сброс индексов для следующей стадии SelectIntervals() по новой оси
+        major_column = self.known_values.columns[self.major_axis]
+        self.known_values = self.known_values.sort_values(by=major_column)
+        self.known_values.reset_index(inplace=True, drop=True)
         pass
 
 
@@ -94,6 +406,12 @@ class MulDimOptimizer:
         self.mins = mins
         self.maxs = maxs
         self.CreateTable()
-        # TODO:
+
+        # TODO: ...
+
+
+
+
+
 
 

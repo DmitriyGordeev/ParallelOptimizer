@@ -1,5 +1,7 @@
 from unittest import TestCase
 import numpy as np
+import pandas as pd
+
 from MulDimOptimizer import MulDimOptimizer
 
 
@@ -29,6 +31,60 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_np_mat(self):
-        # v = np.ones([2, 1])
-        v = np.array([[2, 3], [1, 2]])
+        major_values = [0, 1, 2]
+        mins = [-100, -100]
+        out_matrix = [[0] * len(major_values)] * len(mins)
         pass
+
+
+    def test_create_syntetic_table(self):
+        x1 = [0, 50, 80]
+        x2 = [20, 10, 30]
+        y  = [0, 0, 0]
+        table = pd.DataFrame(columns=["X1", "X2", "Y"])
+        table["X1"] = x1
+        table["X2"] = x2
+        table["Y"] = y
+        table["blocked"] = [False] * len(x1)
+        table["plato_block"] = [False] * len(x1)
+        table["plato_index"] = [-1] * len(x1)
+        table["plato_edge"] = [False] * len(x1)
+
+        table.to_csv("debug_values_mul_dim_0.csv", index=False)
+        pass
+
+
+    def test_SelectIntervals_MajorAxis(self):
+        data = pd.read_csv("debug_values_mul_dim_1.csv")
+        opt = MulDimOptimizer(linear)
+        opt.known_values = data
+
+        opt.mins = [0, 0]
+        opt.maxs = [100, 100]
+        opt.names = ["X1", "X2"]
+
+        opt.major_axis = 0
+        opt.SelectIntervals()
+        opt.UnitMapping()
+        major_values = opt.CreateProbePoints()
+
+        pass
+
+
+
+    def test_SelectSinglePointOnMinorAxis(self):
+        data = pd.read_csv("debug_values_mul_dim_0.csv")
+        opt = MulDimOptimizer(linear)
+        opt.known_values = data
+
+        opt.mins = [0, 0]
+        opt.maxs = [100, 100]
+        opt.names = ["X1", "X2"]
+        opt.major_axis = 0
+
+        axis_values = []
+        for i in range(opt.n_probes):
+            axis_values.append(opt.SelectSinglePointOnMinorAxis(1))
+        pass
+
+

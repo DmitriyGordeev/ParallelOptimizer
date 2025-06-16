@@ -198,7 +198,7 @@ class TestCustomOptimizer(TestCase):
         opt.maxs = [100]
 
         Y_sort = opt.known_values.sample(frac=1)
-        Y_sort = opt.known_values.sort_values(by="Y", ascending=False, kind='stable')
+        Y_sort = Y_sort.sort_values(by="Y", ascending=False, kind='stable')
 
         # # filter rows
         # Y_sort = Y_sort[Y_sort["blocked"] == False]
@@ -279,6 +279,13 @@ class TestCustomOptimizer(TestCase):
 
         pass
 
+
+
+    def test_npappend(self):
+        x = [[]] * 5
+
+        x[1] = [0, 1, 2]
+        pass
 
 
 

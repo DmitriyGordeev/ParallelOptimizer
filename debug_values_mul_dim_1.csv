@@ -1,0 +1,4 @@
+X1,X2,Y,blocked,plato_block,plato_index,plato_edge
+0,20,0,False,False,-1,False
+50,10,100,False,False,-1,False
+80,30,50,False,False,-1,False
