@@ -25,8 +25,8 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_CreateTable(self):
-        opt = MulDimOptimizer(linear)
-        opt.RunCycle(names=["x1", "x2"], mins=[0, 100], maxs=[0, 100], max_epochs=5)
+        opt = MulDimOptimizer(foo2D)
+        opt.RunCycle(names=["x1", "x2"], mins=[0, 0], maxs=[100, 100], max_epochs=5)
         pass
 
 

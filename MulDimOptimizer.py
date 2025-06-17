@@ -266,9 +266,7 @@ class MulDimOptimizer:
 
     def SelectMajorAxisPoints(self, is_forward: bool) -> list:
         if not self.SelectIntervals(is_forward):
-            # TODO:
-            pass
-
+            return []
         self.UnitMapping()
         new_X = self.CreateProbePoints()
         return new_X
@@ -338,6 +336,10 @@ class MulDimOptimizer:
         # предполагаем что на данный момент уже выбрана major_axis из предыдущей итерации
 
         major_values = self.SelectMajorAxisPoints(is_forward)
+        if len(major_values) == 0:
+            print(f"stop iterations, no areas left to divide further")
+            return np.array([])
+
         num_points = len(major_values)
 
         out_matrix = [[0] * len(major_values)] * len(self.mins)
@@ -416,16 +418,49 @@ class MulDimOptimizer:
 
 
     def RunCycle(self, names: list, mins: list, maxs: list, max_epochs: int):
+        assert max_epochs > 0
+
         self.names = names
         self.mins = mins
         self.maxs = maxs
         self.CreateTable()
 
-        # TODO: ...
+        backward_countdown = self.backward_fires_each_n
+
+        for i in range(max_epochs):
+            self.epochs += 1
+            if self.epochs == 1:
+                self.Warmup()
+            else:
+
+                # TODO: plato countdown
 
 
+                # Check if it is backward pass stage
+                is_forward = True
+                if backward_countdown == 0:
+                    is_forward = False
+                    debug_name = "backward"
+                    backward_countdown = self.backward_fires_each_n
+                    print(f" >>> running backward iteration at epoch = {i}")
+                else:
+                    backward_countdown -= 1
 
+                x_matrix = self.GeneratePoints(is_forward=is_forward)
+                if x_matrix.shape[0] == 0:
+                    print(f"No values left, stop")
+                    # TODO: plato_countdown = 0
+                    # TODO: continue
+                    break
 
+                self.RunValues(x_matrix)
 
+                # TODO: FindPlato
 
+                print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
+        self.known_values.sort_values(by="Y", ascending=False, inplace=True)
+        print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ")
+        print(f"Total epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
+              f"\ntop values: -------------------- \n")
+        print(self.known_values.head(5))
