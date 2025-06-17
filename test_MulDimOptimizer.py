@@ -12,6 +12,16 @@ def linear(x):
 def foo2D(x):
     return sum(x)
 
+def decay(x):
+    x0 = x[0]
+    x1 = x[1]
+    if abs(x0) < 1.0:
+        x0 = 1.0
+    if abs(x1) < 1.0:
+        x1 = 1.0
+    return 1.0 / (x0 * x0 + x1 * x1)
+
+
 
 # TODO: дать возможность указывать как запускать вектор переменных с именами в функцию через функтор
 class TestMulDimOptimizer(TestCase):
@@ -25,8 +35,8 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_CreateTable(self):
-        opt = MulDimOptimizer(foo2D)
-        opt.RunCycle(names=["x1", "x2"], mins=[0, 0], maxs=[100, 100], max_epochs=5)
+        opt = MulDimOptimizer(decay)
+        opt.RunCycle(names=["x1", "x2"], mins=[-10, -10], maxs=[10, 10], max_epochs=6)
         pass
 
 
@@ -55,7 +65,7 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_SelectIntervals_MajorAxis(self):
-        data = pd.read_csv("debug_values_mul_dim_1.csv")
+        data = pd.read_csv("debug_values_mul_dim_2.csv")
         opt = MulDimOptimizer(linear)
         opt.known_values = data
 
@@ -64,10 +74,11 @@ class TestMulDimOptimizer(TestCase):
         opt.names = ["X1", "X2"]
 
         opt.major_axis = 0
-        opt.SelectIntervals()
-        opt.UnitMapping()
-        major_values = opt.CreateProbePoints()
+        # opt.SelectIntervals()
+        # opt.UnitMapping()
+        # major_values = opt.CreateProbePoints()
 
+        opt.SelectMajorAxisPoints(is_forward=False)
         pass
 
 
