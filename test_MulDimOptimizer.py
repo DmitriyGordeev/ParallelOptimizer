@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 from MulDimOptimizer import MulDimOptimizer
+from PlatoModule_MulDim import PlatoModule_MulDim
 
 
 def linear(x):
@@ -127,3 +128,36 @@ class TestMulDimOptimizer(TestCase):
 
         opt.CreateTable()
         opt.Warmup()
+
+
+
+    def test_find_plato(self):
+        data = pd.read_csv("debug_values_mul_dim_2.csv")
+        data.loc[:, "Y"] = 0
+        opt = MulDimOptimizer(foo2D)
+        opt.known_values = data
+
+
+        opt.mins = [0, 0]
+        opt.maxs = [100, 100]
+        opt.names = ["X1", "X2"]
+        opt.major_axis = 0
+
+        plato_module = PlatoModule_MulDim(opt)
+        plato_module.plato_x_eps = 10
+
+        plato_module.FindPlatoRegions()
+        plato_module.MarkPlatoRegions()
+        plato_module.GroupTables()
+        plato_module.UnitMapRegions()
+        matrix = plato_module.UnmapValues()
+        pass
+
+
+    def test_np_unique(self):
+        arr = np.array([[1.1, 2.0, 3.0, 1.1],
+                        [4.0, 5, 6, 4.2],
+                        [7.1, 8, 9, 7.1]])
+
+        unique_columns_arr = np.unique(arr.astype(float), axis=1)
+        print(unique_columns_arr)
