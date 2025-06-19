@@ -1,7 +1,9 @@
 from random import random
+from typing import Optional
 
 import pandas as pd
 import numpy as np
+
 
 
 class MulDimOptimizer:
@@ -24,18 +26,23 @@ class MulDimOptimizer:
         self.maxs = []
         self.major_axis = -1
 
-        self.plato_indexes = []
-
         self.block_eps = 0.01
-        self.plato_X_eps = 10.0
-        self.plato_block_eps = 0.5
-        self.plato_Y_eps = 0.01
+        self.plato_module = PlatoModule_MulDim(self)
 
         # # Debug --------------
         # self.debug_old_X = []
         # self.debug_old_Y = []
         # self.debug_new_X = []
         # self.debug_new_Y = []
+
+
+
+    def SetupEps(self, block_eps = 0.01, plato_x_eps = 0.1, plato_y_eps = 0.1, plato_block_eps = 0.01):
+        self.block_eps = block_eps
+        # self.plato_module = PlatoModule_MulDim(self)
+        self.plato_module.plato_x_eps = plato_x_eps
+        self.plato_module.plato_y_eps = plato_y_eps
+        self.plato_module.plato_x_block_eps = plato_block_eps
 
 
 
@@ -272,6 +279,8 @@ class MulDimOptimizer:
         return new_X
 
 
+
+
     def SelectSinglePointOnMinorAxis(self, axis: int) -> float:
         assert 0 <= axis < len(self.mins)
         assert axis != self.major_axis
@@ -426,6 +435,7 @@ class MulDimOptimizer:
         self.CreateTable()
 
         backward_countdown = self.backward_fires_each_n
+        plato_countdown = self.plato_fires_each_n
 
         for i in range(max_epochs):
             self.epochs += 1
@@ -433,7 +443,29 @@ class MulDimOptimizer:
                 self.Warmup()
             else:
 
-                # TODO: plato countdown
+                # Check if it is a plato stage
+                if plato_countdown == 0:
+                    print(f" >>> running plato iteration at epoch = {self.epochs}")
+                    plato_countdown = self.plato_fires_each_n
+                    if len(self.plato_module.plato_indexes) == 0:
+                        print(f"no plato detected, skip plato iteration")
+                        continue
+                    new_X = self.plato_module.GeneratePlatoPoints()
+                    # self.debug_old_X = self.known_values["X"].to_list()
+                    # self.debug_old_Y = self.known_values["Y"].to_list()
+
+                    if len(new_X) == 0:
+                        print("Plato run: new_X is empty array, skip this iteration")
+                        continue
+
+                    self.RunValues(new_X)
+                    # self.DebugPlot("plato")
+
+                    self.plato_module.FindPlatoRegions()
+                    self.plato_module.MarkPlatoRegions()
+                    continue
+                else:
+                    plato_countdown -= 1
 
 
                 # Check if it is backward pass stage
@@ -448,14 +480,15 @@ class MulDimOptimizer:
 
                 x_matrix = self.GeneratePoints(is_forward=is_forward)
                 if x_matrix.shape[0] == 0:
-                    print(f"No values left, stop")
-                    # TODO: plato_countdown = 0
-                    # TODO: continue
+                    if len(self.plato_module.plato_indexes) > 0:
+                        print(f"only plato regions left at this moment, continue next epoch with plato run")
+                        plato_countdown = 0
+                        continue
                     break
 
                 self.RunValues(x_matrix)
-
-                # TODO: FindPlato
+                self.plato_module.FindPlatoRegions()
+                self.plato_module.MarkPlatoRegions()
 
                 print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
@@ -464,3 +497,8 @@ class MulDimOptimizer:
         print(f"Total epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
               f"\ntop values: -------------------- \n")
         print(self.known_values.head(5))
+
+
+
+
+from PlatoModule_MulDim import PlatoModule_MulDim

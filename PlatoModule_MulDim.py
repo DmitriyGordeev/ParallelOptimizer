@@ -159,3 +159,9 @@ class PlatoModule_MulDim:
         out_X = np.transpose(out_X)     # rows = axes, columns = points
         out_X = np.unique(out_X.astype(float), axis=1)
         return out_X
+
+
+    def GeneratePlatoPoints(self) -> np.array:
+        self.GroupTables()
+        self.UnitMapRegions()
+        return self.UnmapValues()
