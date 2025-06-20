@@ -327,7 +327,7 @@ class TestMulDimOptimizer(TestCase):
     def test_GeneratePoints_ExcludesPlatoRegions(self):
         opt = self.CreateOptimizer_Instance("test_table1.csv")
 
-        # 10 раз проверяем, что диапазон значений по major_axis верен (исключен плато-регион [0, 10] из таблицы)
+        # несколько раз проверяем, что диапазон значений по major_axis верен (плюс исключен плато-регион [0, 10] из таблицы)
         opt.major_axis = 0
         for k in range(10):
             x_matrix = opt.GeneratePoints(is_forward=True)
@@ -340,3 +340,41 @@ class TestMulDimOptimizer(TestCase):
             x_matrix = opt.GeneratePoints(is_forward=True)
             for i in range(x_matrix.shape[1]):
                 self.assertTrue(-10.0 <= x_matrix[opt.major_axis, i] <= 0.0)
+
+
+    # =========================================================================================
+    # Warmup
+    def test_Warmup_ShapeAndValues(self):
+        opt = MulDimOptimizer(linear)
+        opt.Init(names=["x1", "x2"], mins=[-10, -10], maxs=[10, 10])
+        opt.Warmup()
+
+        self.assertEqual(3, opt.known_values.shape[0])
+
+        gt_values = [-10, 0, 10]
+        for i in range(3):
+            self.assertEqual(gt_values[i], opt.known_values.iloc[i][0])
+            self.assertEqual(gt_values[i], opt.known_values.iloc[i][1])
+
+
+    # =========================================================================================
+    # RunValues
+    def test_RunValues(self):
+        opt = self.CreateOptimizer_Instance("test_table2.csv")
+        opt.major_axis = 0
+
+        old_size = opt.known_values.shape[0]
+        x_matrix = opt.GeneratePoints(is_forward=True)
+        opt.RunValues(x_matrix)
+        new_size = opt.known_values.shape[0]
+
+        self.assertEqual(new_size, old_size + x_matrix.shape[1])
+        self.assertEqual(1, opt.major_axis)
+
+        # проверяем, что opt.known_values отсортирован после "очередного" прогона
+        table = opt.known_values
+        major_column = table.columns[opt.major_axis]
+        table.sort_values(by=major_column)
+        for i in range(table.shape[0]):
+            gt_sorted_value = table.iloc[i][major_column]
+            self.assertAlmostEqual(gt_sorted_value, opt.known_values.iloc[i][major_column], 5)
