@@ -291,7 +291,6 @@ class MulDimOptimizer:
 
 
 
-
     def SelectSinglePointOnMinorAxis(self, axis: int) -> float:
         assert 0 <= axis < len(self.mins)
         assert axis != self.major_axis

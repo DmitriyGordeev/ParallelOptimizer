@@ -269,3 +269,74 @@ class TestMulDimOptimizer(TestCase):
         for gv in gt_values:
             unmapped_x = opt.UnmapValue(gv[0])
             self.assertAlmostEqual(gv[1], unmapped_x, 3)
+
+
+
+    # =========================================================================================
+    # SelectSinglePointOnMinorAxis
+    def test_SelectSinglePointOnMinorAxis_ValueRange(self):
+        opt = self.CreateOptimizer_Instance("test_table4.csv")
+        opt.major_axis = 1
+
+        axis_min = opt.known_values[opt.known_values.columns[0]].min()
+        axis_max = opt.known_values[opt.known_values.columns[0]].max()
+
+        for i in range(10):
+            x = opt.SelectSinglePointOnMinorAxis(0)
+            self.assertTrue(axis_min <= x <= axis_max)
+
+
+
+    # =========================================================================================
+    # GeneratePoints
+    def test_GeneratePoints_ForwardPass_ValuesRangeCorrect(self):
+        opt = self.CreateOptimizer_Instance("test_table4.csv")
+        opt.major_axis = 0
+
+        x1_min = opt.known_values[opt.known_values.columns[0]].min()
+        x1_max = opt.known_values[opt.known_values.columns[0]].max()
+
+        x2_min = opt.known_values[opt.known_values.columns[1]].min()
+        x2_max = opt.known_values[opt.known_values.columns[1]].max()
+
+        x_matrix = opt.GeneratePoints(is_forward=True)
+        for i in range(x_matrix.shape[1]):
+            self.assertTrue(x1_min <= x_matrix[0, i] <= x1_max)
+            self.assertTrue(x2_min <= x_matrix[1, i] <= x2_max)
+
+
+    def test_GeneratePoints_BackwardPass_ValuesRangeCorrect(self):
+        opt = self.CreateOptimizer_Instance("test_table3.csv")
+        opt.backward_intervals = 4
+
+        opt.major_axis = 0
+        for k in range(10):
+            x_matrix = opt.GeneratePoints(is_forward=False)
+            for i in range(x_matrix.shape[1]):
+                value = x_matrix[opt.major_axis, i]
+                self.assertTrue(-6.0 <= value <= 3.0)
+
+        opt.major_axis = 1
+        for k in range(10):
+            x_matrix = opt.GeneratePoints(is_forward=False)
+            for i in range(x_matrix.shape[1]):
+                value = x_matrix[opt.major_axis, i]
+                self.assertTrue(-6.0 <= value <= 3.0)
+
+
+    def test_GeneratePoints_ExcludesPlatoRegions(self):
+        opt = self.CreateOptimizer_Instance("test_table1.csv")
+
+        # 10 раз проверяем, что диапазон значений по major_axis верен (исключен плато-регион [0, 10] из таблицы)
+        opt.major_axis = 0
+        for k in range(10):
+            x_matrix = opt.GeneratePoints(is_forward=True)
+            for i in range(x_matrix.shape[1]):
+                self.assertTrue(-10.0 <= x_matrix[opt.major_axis, i] <= 0.0)
+
+        # то же самое по второй координате
+        opt.major_axis = 1
+        for k in range(10):
+            x_matrix = opt.GeneratePoints(is_forward=True)
+            for i in range(x_matrix.shape[1]):
+                self.assertTrue(-10.0 <= x_matrix[opt.major_axis, i] <= 0.0)
