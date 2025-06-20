@@ -198,6 +198,8 @@ class MulDimOptimizer:
 
 
     def CanSelectPoint(self, l_index: int, r_index: int) -> bool:
+        assert l_index >= 0 and r_index >= 0
+
         plato_index_l = self.known_values.iloc[l_index]["plato_index"]
         plato_index_r = self.known_values.iloc[r_index]["plato_index"]
 
