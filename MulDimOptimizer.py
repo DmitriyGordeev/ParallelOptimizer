@@ -10,7 +10,7 @@ class MulDimOptimizer:
     def __init__(self, objective: callable):
         self.known_values = pd.DataFrame()
         self.squeeze_factor = 0.8
-        self.major_axis_intervals = pd.DataFrame(columns=["x0", "x1", "cost"])
+        self.major_axis_intervals = pd.DataFrame(columns=["xL", "xR", "cost"])
         self.u_coords = []
         self.n_probes = 5
         self.num_forward_intervals = 7
@@ -45,7 +45,8 @@ class MulDimOptimizer:
         self.plato_module.plato_x_block_eps = plato_block_eps
 
 
-
+    # TODO: переделать - добавить аргументы mins, maxs, names вместо того чтобы делать это в RunCycle
+    #   эта функция должна быть инициализатором оптимайзера
     def CreateTable(self):
         assert len(self.mins) > 0
         assert len(self.mins) == len(self.maxs) == len(self.names)
@@ -84,8 +85,8 @@ class MulDimOptimizer:
 
             dx = X[iR] - X[iL]
             mid_point = (X[iR] + X[iL]) / 2
-            x0 = mid_point - dx * self.squeeze_factor / 2
-            x1 = mid_point + dx * self.squeeze_factor / 2
+            xL = mid_point - dx * self.squeeze_factor / 2
+            xR = mid_point + dx * self.squeeze_factor / 2
 
             # TODO: сделать параметром eps (0.0001) -
             #  точность, при которой в наших масштабах
@@ -99,8 +100,8 @@ class MulDimOptimizer:
             sum_cost += y1_cost + y2_cost
 
             self.major_axis_intervals = self.major_axis_intervals._append({
-                "x0": x0,
-                "x1": x1,
+                "xL": xL,
+                "xR": xR,
                 "cost": y1_cost + y2_cost
             }, ignore_index=True)
 
@@ -247,9 +248,9 @@ class MulDimOptimizer:
 
             if u_pair[0] <= u_pick <= u_pair[1]:
                 alpha = (u_pick - u_pair[0]) / (u_pair[1] - u_pair[0])
-                x0 = self.major_axis_intervals.iloc[i]["x0"]
-                x1 = self.major_axis_intervals.iloc[i]["x1"]
-                X_unmapped = x0 + (x1 - x0) * alpha
+                xL = self.major_axis_intervals.iloc[i]["xL"]
+                xR = self.major_axis_intervals.iloc[i]["xR"]
+                X_unmapped = xL + (xR - xL) * alpha
                 break
 
             else:

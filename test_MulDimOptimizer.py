@@ -144,3 +144,28 @@ class TestMulDimOptimizer(TestCase):
         gt_intervals = {(4, 5), (5, 6), (6, 7)}
         out_intervals = opt.CreateBackwardIntervalSet()
         self.assertEqual(gt_intervals, out_intervals)
+
+
+    # ========================================================================================
+    # SelectIntervals()
+    def test_SelectIntervals(self):
+        opt = self.CreateOptimizer_Instance("test_table2.csv")
+        opt.known_values.loc[:, "Y"] = 0
+
+        self.assertTrue(opt.SelectIntervals())
+        self.assertTrue(opt.major_axis_intervals.shape[0] > 0)
+
+        gt_interval_points_xL = [-9.5, -4.5, 0.5, 5.5]
+        gt_interval_points_xR = [-5.5, -0.5, 4.5, 9.5]
+        gt_cost = 0.25
+
+        out_interval_points_xL = sorted(opt.major_axis_intervals["xL"].to_list())
+        out_interval_points_xR = sorted(opt.major_axis_intervals["xR"].to_list())
+        out_cost = opt.major_axis_intervals["cost"].to_list()
+
+        for i in range(opt.major_axis_intervals.shape[0]):
+            self.assertAlmostEqual(gt_interval_points_xL[i], out_interval_points_xL[i], 3)
+            self.assertAlmostEqual(gt_interval_points_xR[i], out_interval_points_xR[i], 3)
+            self.assertEqual(gt_cost, out_cost[i])
+
+        self.assertAlmostEqual(1.0, opt.major_axis_intervals["cost"].sum(), 5)
