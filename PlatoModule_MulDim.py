@@ -26,14 +26,15 @@ class PlatoModule_MulDim:
         l_index = -1
         r_index = -1
         platos = []
+        obj_column = self.optimizer.objective_column
 
         values = self.optimizer.known_values
         for i in range(values.shape[0] - 1):
             x_vector = values.iloc[i][0 : len(self.optimizer.mins)].to_numpy()
-            y_objective = values.iloc[i]["Y"]
+            y_objective = values.iloc[i][obj_column]
 
             x_next = values.iloc[i + 1][0 : len(self.optimizer.mins)].to_numpy()
-            y_next = values.iloc[i + 1]["Y"]
+            y_next = values.iloc[i + 1][obj_column]
 
             # distance
             distance = np.linalg.norm(x_vector - x_next)

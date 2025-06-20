@@ -1,38 +1,6 @@
-import math
+
 from unittest import TestCase
-import numpy as np
-import pandas as pd
-
-from MulDimOptimizer import MulDimOptimizer
-
-
-def linear(x):
-    return x * 2 + 3.0
-
-
-def foo2D(x):
-    return sum(x)
-
-
-def const2D(x):
-    return 0.0
-
-
-def decay(x):
-    x0 = x[0]
-    x1 = x[1]
-    if abs(x0) < 1.0:
-        x0 = 1.0
-    if abs(x1) < 1.0:
-        x1 = 1.0
-    return 1.0 / (x0 * x0 + x1 * x1)
-
-
-def sombrero(x):
-    denom = math.sqrt(x[0] ** 2 + x[1] ** 2)
-    if denom == 0:
-        return 1.0
-    return math.sin(math.sqrt(x[0] ** 2 + x[1] ** 2)) / denom
+from test_helper import *
 
 
 # TODO: дать возможность указывать как запускать вектор переменных с именами в функцию через функтор
@@ -40,62 +8,22 @@ def sombrero(x):
 # TODO: добавить функцую, которая генерирует таблицы test_table*.csv (пишет в файл) в начале тестов setup/teardown ?
 class TestMulDimOptimizer(TestCase):
 
-
-    @staticmethod
-    def CreateOptimizer_Instance(table: str) -> MulDimOptimizer:
-        data = pd.read_csv(table)
-        opt = MulDimOptimizer(linear)
-        opt.known_values = data
-        opt.major_axis = 0
-
-        opt.mins = [-10, -10]
-        opt.maxs = [10, 10]
-        opt.names = ["x1", "x2"]
-        return opt
-
-
-    @staticmethod
-    def CreateOptimizer_Sum() -> MulDimOptimizer:
-        opt = MulDimOptimizer(linear)
-        values = np.arange(-10, 11)
-        opt.known_values["x1"] = values
-        opt.known_values["x2"] = values
-        opt.known_values["Objective"] = values
-
-        names = ["x1", "x2"]
-        mins = [values[0], values[0]]
-        maxs = [values[-1], values[-1]]
-
-        opt.Init(names=names, mins=mins, maxs=maxs)
-
-        opt.known_values["x1"] = values
-        opt.known_values["x2"] = values
-        opt.known_values["Objective"] = values + values
-        opt.known_values.loc[:, 'blocked'] = False
-        opt.known_values.loc[:, 'plato_block'] = False
-        opt.known_values.loc[:, 'plato_index'] = -1
-        opt.known_values.loc[:, 'plato_edge'] = False
-
-        opt.major_axis = 0
-        return opt
-
-
     # ========================================================================================
     # CanSelectPoint()
     def test_CanSelectPoint_ReturnsTrue(self):
-        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt = CreateOptimizer_Instance("test_table1.csv")
         result = opt.CanSelectPoint(l_index=0, r_index=1)
         self.assertTrue(result)
 
 
     def test_CanSelectPoint_PlatoEdge_ReturnsTrue(self):
-        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt = CreateOptimizer_Instance("test_table1.csv")
         result = opt.CanSelectPoint(l_index=1, r_index=2)
         self.assertTrue(result)
 
 
     def test_CanSelectPoint_InsidePlato_ReturnsFalse(self):
-        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt = CreateOptimizer_Instance("test_table1.csv")
         result = opt.CanSelectPoint(l_index=2, r_index=3)
         self.assertFalse(result)
 
@@ -103,7 +31,7 @@ class TestMulDimOptimizer(TestCase):
     # ========================================================================================
     # CreateIntervalSet()
     def test_CreateIntervalSet_NoPlato(self):
-        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt = CreateOptimizer_Instance("test_table1.csv")
         opt.known_values.loc[:, "plato_index"] = -1
         opt.known_values.loc[:, "plato_edge"] = False
 
@@ -113,7 +41,7 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_CreateIntervalSet_LimitedNumber(self):
-        opt = self.CreateOptimizer_Sum()
+        opt = CreateOptimizer_Sum()
         opt.num_forward_intervals = 5
 
         gt_intervals = {(15, 16), (16, 17), (17, 18), (18, 19), (19, 20)}
@@ -122,7 +50,7 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_CreateIntervalSet_ExcludePlatoPoints(self):
-        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt = CreateOptimizer_Instance("test_table1.csv")
         opt.num_forward_intervals = 10
         gt_intervals = {(0, 1), (1, 2)}
         out_intervals = opt.CreateIntervalSet()
@@ -132,7 +60,7 @@ class TestMulDimOptimizer(TestCase):
     # ========================================================================================
     # CreateBackwardIntervalSet()
     def test_CreateBackwardIntervalSet_NoBackwardIntervalsAvailable(self):
-        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt = CreateOptimizer_Instance("test_table1.csv")
         opt.known_values.loc[:, "plato_index"] = -1
         opt.known_values.loc[:, "plato_edge"] = False
         opt.num_forward_intervals = opt.known_values.shape[0] - 1
@@ -141,7 +69,7 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_CreateBackwardIntervalSet_ExcludePlato(self):
-        opt = self.CreateOptimizer_Instance("test_table3.csv")
+        opt = CreateOptimizer_Instance("test_table3.csv")
         opt.num_forward_intervals = 4
 
         gt_intervals = {(4, 5), (5, 6), (6, 7)}
@@ -152,7 +80,7 @@ class TestMulDimOptimizer(TestCase):
     # ========================================================================================
     # SelectIntervals()
     def test_SelectIntervals_NoPlato(self):
-        opt = self.CreateOptimizer_Instance("test_table2.csv")
+        opt = CreateOptimizer_Instance("test_table2.csv")
         opt.known_values.loc[:, "Objective"] = 0
 
         self.assertTrue(opt.SelectIntervals())
@@ -175,7 +103,7 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_SelectIntervals_ExcludesPlatoRegions(self):
-        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt = CreateOptimizer_Instance("test_table1.csv")
         opt.known_values.loc[:, "Objective"] = 0
 
         self.assertTrue(opt.SelectIntervals())
@@ -198,7 +126,7 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_SelectIntervals_ExcludesPlatoRegions_BackwardPass_NonConstObjective(self):
-        opt = self.CreateOptimizer_Instance("test_table3.csv")
+        opt = CreateOptimizer_Instance("test_table3.csv")
         self.assertTrue(opt.SelectIntervals(forward=False))
         self.assertTrue(opt.major_axis_intervals.shape[0] == 3)
 
@@ -222,13 +150,13 @@ class TestMulDimOptimizer(TestCase):
     # =========================================================================================
     # UnitMapping()
     def test_UnitMapping_EmptyIntervals(self):
-        opt = self.CreateOptimizer_Instance("test_table3.csv")
+        opt = CreateOptimizer_Instance("test_table3.csv")
         opt.UnitMapping()
         self.assertTrue(len(opt.u_coords) == 0)
 
 
     def test_UnitMapping_CorrectValues(self):
-        opt = self.CreateOptimizer_Instance("test_table2.csv")
+        opt = CreateOptimizer_Instance("test_table2.csv")
         self.assertTrue(opt.SelectIntervals())
         self.assertTrue(opt.major_axis_intervals.shape[0] > 0)
 
@@ -250,7 +178,7 @@ class TestMulDimOptimizer(TestCase):
     # =========================================================================================
     # UnmapValue()
     def test_UnmapValue_CorrectValues(self):
-        opt = self.CreateOptimizer_Instance("test_table2.csv")
+        opt = CreateOptimizer_Instance("test_table2.csv")
 
         self.assertTrue(opt.SelectIntervals())
         self.assertTrue(opt.major_axis_intervals.shape[0] > 0)
@@ -275,7 +203,7 @@ class TestMulDimOptimizer(TestCase):
     # =========================================================================================
     # SelectSinglePointOnMinorAxis
     def test_SelectSinglePointOnMinorAxis_ValueRange(self):
-        opt = self.CreateOptimizer_Instance("test_table4.csv")
+        opt = CreateOptimizer_Instance("test_table4.csv")
         opt.major_axis = 1
 
         axis_min = opt.known_values[opt.known_values.columns[0]].min()
@@ -290,7 +218,7 @@ class TestMulDimOptimizer(TestCase):
     # =========================================================================================
     # GeneratePoints
     def test_GeneratePoints_ForwardPass_ValuesRangeCorrect(self):
-        opt = self.CreateOptimizer_Instance("test_table4.csv")
+        opt = CreateOptimizer_Instance("test_table4.csv")
         opt.major_axis = 0
 
         x1_min = opt.known_values[opt.known_values.columns[0]].min()
@@ -306,7 +234,7 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_GeneratePoints_BackwardPass_ValuesRangeCorrect(self):
-        opt = self.CreateOptimizer_Instance("test_table3.csv")
+        opt = CreateOptimizer_Instance("test_table3.csv")
         opt.backward_intervals = 4
 
         opt.major_axis = 0
@@ -325,7 +253,7 @@ class TestMulDimOptimizer(TestCase):
 
 
     def test_GeneratePoints_ExcludesPlatoRegions(self):
-        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt = CreateOptimizer_Instance("test_table1.csv")
 
         # несколько раз проверяем, что диапазон значений по major_axis верен (плюс исключен плато-регион [0, 10] из таблицы)
         opt.major_axis = 0
@@ -360,7 +288,7 @@ class TestMulDimOptimizer(TestCase):
     # =========================================================================================
     # RunValues
     def test_RunValues(self):
-        opt = self.CreateOptimizer_Instance("test_table2.csv")
+        opt = CreateOptimizer_Instance("test_table2.csv")
         opt.major_axis = 0
 
         old_size = opt.known_values.shape[0]
