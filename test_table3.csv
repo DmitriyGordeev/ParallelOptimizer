@@ -1,4 +1,4 @@
-x1,x2,Y,blocked,plato_block,plato_index,plato_edge
+x1,x2,Objective,blocked,plato_block,plato_index,plato_edge
 -10,-10,-20,False,False,0,True
 -9,-9,-18,False,False,0,False
 -8,-8,-16,False,False,0,False

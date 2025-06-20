@@ -18,6 +18,7 @@ class MulDimOptimizer:
         self.backward_fires_each_n = 4
         self.plato_fires_each_n = 2
         self.objective = objective
+        self.objective_column = "Objective"
         self.epochs = 0
         self.internal_itr = 0
 
@@ -39,27 +40,34 @@ class MulDimOptimizer:
 
     def SetupEps(self, block_eps = 0.01, plato_x_eps = 0.1, plato_y_eps = 0.1, plato_block_eps = 0.01):
         self.block_eps = block_eps
-        # self.plato_module = PlatoModule_MulDim(self)
         self.plato_module.plato_x_eps = plato_x_eps
         self.plato_module.plato_y_eps = plato_y_eps
         self.plato_module.plato_x_block_eps = plato_block_eps
 
 
-    # TODO: переделать - добавить аргументы mins, maxs, names вместо того чтобы делать это в RunCycle
-    #   эта функция должна быть инициализатором оптимайзера
-    def CreateTable(self):
-        assert len(self.mins) > 0
-        assert len(self.mins) == len(self.maxs) == len(self.names)
-        # TODO: сделать так, чтобы Y не повторялся в названиях колонок, если одна из переменных тоже названа также
-        columns = self.names + ["Y", "blocked", "plato_block", "plato_index", "plato_edge"]
+
+    def Init(self, names: list, mins: list, maxs: list):
+        assert len(mins) > 0
+        assert len(mins) == len(maxs) == len(names)
+        self.names = names
+        self.mins = mins
+        self.maxs = maxs
+
+        objective_column = "Objective"
+        if "Objective" in self.names:
+            for n in names:
+                objective_column += "_" + n
+        
+        columns = self.names + [objective_column, "blocked", "plato_block", "plato_index", "plato_edge"]
         self.known_values = pd.DataFrame(columns=columns)
+        self.objective_column = objective_column
         self.major_axis = 0
 
 
 
     def SelectIntervals(self, forward=True) -> bool:
-        min_y = self.known_values["Y"].min()
-        max_y = self.known_values["Y"].max()
+        min_y = self.known_values[self.objective_column].min()
+        max_y = self.known_values[self.objective_column].max()
 
         # cleanup values from previous run
         self.major_axis_intervals = self.major_axis_intervals.drop(self.major_axis_intervals.index)
@@ -68,7 +76,7 @@ class MulDimOptimizer:
 
         major_column = self.known_values.columns[self.major_axis]
         X = self.known_values[major_column].to_numpy()
-        Y = self.known_values["Y"].to_numpy()
+        Y = self.known_values[self.objective_column].to_numpy()
 
         if forward:
             areas = self.CreateIntervalSet()
@@ -121,7 +129,7 @@ class MulDimOptimizer:
 
     def CreateIntervalSet(self):
         Y_sort = self.known_values.sample(frac=1)
-        Y_sort = Y_sort.sort_values(by="Y", ascending=False, kind='stable')
+        Y_sort = Y_sort.sort_values(by=self.objective_column, ascending=False, kind='stable')
 
         # select only from non-blocked intervals
         Y_sort = Y_sort[Y_sort["blocked"] == False]
@@ -166,7 +174,7 @@ class MulDimOptimizer:
         # Перемешиваем, чтобы не создавать преференцию по X
         # и сортриуем в обратном порядке нежели чем в CreateIntervalSet()
         Y_sort = self.known_values.sample(frac=1)
-        Y_sort = Y_sort.sort_values(by="Y", ascending=True, kind='stable')
+        Y_sort = Y_sort.sort_values(by=self.objective_column, ascending=True, kind='stable')
 
         # select only from non-blocked intervals
         Y_sort = Y_sort[Y_sort["blocked"] == False]
@@ -290,14 +298,14 @@ class MulDimOptimizer:
         axis = self.known_values.columns[axis]
 
         Y_sort = self.known_values.sample(frac=1)
-        Y_sort = Y_sort.sort_values(by="Y", ascending=False, kind='stable')
-        Y_max = float(Y_sort.iloc[0]["Y"])
-        Y_min = float(Y_sort.iloc[-1]["Y"])
+        Y_sort = Y_sort.sort_values(by=self.objective_column, ascending=False, kind='stable')
+        Y_max = float(Y_sort.iloc[0][self.objective_column])
+        Y_min = float(Y_sort.iloc[-1][self.objective_column])
 
         Y_range = Y_max - Y_min
         Y_sort["w"] = [1.0 / Y_sort.shape[0]] * Y_sort.shape[0]
         if Y_range != 0.0:
-            Y_sort["w"] += (Y_sort["Y"] - Y_min) / (Y_max - Y_min)
+            Y_sort["w"] += (Y_sort[self.objective_column] - Y_min) / (Y_max - Y_min)
             wsum = Y_sort["w"].sum()
             Y_sort["w"] /= wsum
 
@@ -405,7 +413,7 @@ class MulDimOptimizer:
             # self.debug_new_Y.append(y)
 
             result_dict = {
-                "Y": y,
+                self.objective_column: y,
                 "blocked": False,
                 "plato_block": False,
                 "plato_index": -1,
@@ -429,13 +437,8 @@ class MulDimOptimizer:
         pass
 
 
-    def RunCycle(self, names: list, mins: list, maxs: list, max_epochs: int):
+    def RunCycle(self, max_epochs: int):
         assert max_epochs > 0
-
-        self.names = names
-        self.mins = mins
-        self.maxs = maxs
-        self.CreateTable()
 
         backward_countdown = self.backward_fires_each_n
         plato_countdown = self.plato_fires_each_n
@@ -455,7 +458,7 @@ class MulDimOptimizer:
                         continue
                     new_X = self.plato_module.GeneratePlatoPoints()
                     # self.debug_old_X = self.known_values["X"].to_list()
-                    # self.debug_old_Y = self.known_values["Y"].to_list()
+                    # self.debug_old_Y = self.known_values[self.objective_column].to_list()
 
                     if len(new_X) == 0:
                         print("Plato run: new_X is empty array, skip this iteration")
@@ -495,7 +498,7 @@ class MulDimOptimizer:
 
                 print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
-        self.known_values.sort_values(by="Y", ascending=False, inplace=True)
+        self.known_values.sort_values(by=self.objective_column, ascending=False, inplace=True)
         print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ")
         print(f"Total epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
               f"\ntop values: -------------------- \n")

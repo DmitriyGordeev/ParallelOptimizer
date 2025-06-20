@@ -60,16 +60,17 @@ class TestMulDimOptimizer(TestCase):
         values = np.arange(-10, 11)
         opt.known_values["x1"] = values
         opt.known_values["x2"] = values
-        opt.known_values["Y"] = values
+        opt.known_values["Objective"] = values
 
-        opt.mins = [values[0], values[0]]
-        opt.maxs = [values[-1], values[-1]]
-        opt.names = ["x1", "x2"]
+        names = ["x1", "x2"]
+        mins = [values[0], values[0]]
+        maxs = [values[-1], values[-1]]
 
-        opt.CreateTable()
+        opt.Init(names=names, mins=mins, maxs=maxs)
+
         opt.known_values["x1"] = values
         opt.known_values["x2"] = values
-        opt.known_values["Y"] = values + values
+        opt.known_values["Objective"] = values + values
         opt.known_values.loc[:, 'blocked'] = False
         opt.known_values.loc[:, 'plato_block'] = False
         opt.known_values.loc[:, 'plato_index'] = -1
@@ -152,7 +153,7 @@ class TestMulDimOptimizer(TestCase):
     # SelectIntervals()
     def test_SelectIntervals_NoPlato(self):
         opt = self.CreateOptimizer_Instance("test_table2.csv")
-        opt.known_values.loc[:, "Y"] = 0
+        opt.known_values.loc[:, "Objective"] = 0
 
         self.assertTrue(opt.SelectIntervals())
         self.assertTrue(opt.major_axis_intervals.shape[0] > 0)
@@ -175,7 +176,7 @@ class TestMulDimOptimizer(TestCase):
 
     def test_SelectIntervals_ExcludesPlatoRegions(self):
         opt = self.CreateOptimizer_Instance("test_table1.csv")
-        opt.known_values.loc[:, "Y"] = 0
+        opt.known_values.loc[:, "Objective"] = 0
 
         self.assertTrue(opt.SelectIntervals())
         self.assertTrue(opt.major_axis_intervals.shape[0] == 2)
