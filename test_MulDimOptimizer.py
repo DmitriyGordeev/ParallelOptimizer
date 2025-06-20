@@ -36,6 +36,8 @@ def sombrero(x):
 
 
 # TODO: дать возможность указывать как запускать вектор переменных с именами в функцию через функтор
+
+# TODO: добавить функцую, которая генерирует таблицы test_table*.csv (пишет в файл) в начале тестов setup/teardown ?
 class TestMulDimOptimizer(TestCase):
 
 
@@ -148,7 +150,7 @@ class TestMulDimOptimizer(TestCase):
 
     # ========================================================================================
     # SelectIntervals()
-    def test_SelectIntervals(self):
+    def test_SelectIntervals_NoPlato(self):
         opt = self.CreateOptimizer_Instance("test_table2.csv")
         opt.known_values.loc[:, "Y"] = 0
 
@@ -169,3 +171,100 @@ class TestMulDimOptimizer(TestCase):
             self.assertEqual(gt_cost, out_cost[i])
 
         self.assertAlmostEqual(1.0, opt.major_axis_intervals["cost"].sum(), 5)
+
+
+    def test_SelectIntervals_ExcludesPlatoRegions(self):
+        opt = self.CreateOptimizer_Instance("test_table1.csv")
+        opt.known_values.loc[:, "Y"] = 0
+
+        self.assertTrue(opt.SelectIntervals())
+        self.assertTrue(opt.major_axis_intervals.shape[0] == 2)
+
+        gt_xL = [-9.5, -4.5]
+        gt_xR = [-5.5, -0.5]
+        gt_cost = [0.5, 0.5]
+
+        out_interval_points_xL = sorted(opt.major_axis_intervals["xL"].to_list())
+        out_interval_points_xR = sorted(opt.major_axis_intervals["xR"].to_list())
+        out_cost = opt.major_axis_intervals["cost"].to_list()
+
+        for i in range(opt.major_axis_intervals.shape[0]):
+            self.assertAlmostEqual(gt_xL[i], out_interval_points_xL[i], 3)
+            self.assertAlmostEqual(gt_xR[i], out_interval_points_xR[i], 3)
+            self.assertEqual(gt_cost[i], out_cost[i])
+
+        self.assertAlmostEqual(1.0, opt.major_axis_intervals["cost"].sum(), 5)
+
+
+    def test_SelectIntervals_ExcludesPlatoRegions_BackwardPass_NonConstObjective(self):
+        opt = self.CreateOptimizer_Instance("test_table3.csv")
+        self.assertTrue(opt.SelectIntervals(forward=False))
+        self.assertTrue(opt.major_axis_intervals.shape[0] == 3)
+
+        gt_xL = [-5.9, -4.9, -3.9]
+        gt_xR = [-5.1, -4.1, -3.1]
+        gt_cost = [0.2888888888888889, 0.3333333333333333, 0.37777777777777777]
+
+        out_interval_points_xL = sorted(opt.major_axis_intervals["xL"].to_list())
+        out_interval_points_xR = sorted(opt.major_axis_intervals["xR"].to_list())
+        out_cost = opt.major_axis_intervals["cost"].to_list()
+
+        for i in range(opt.major_axis_intervals.shape[0]):
+            self.assertAlmostEqual(gt_xL[i], out_interval_points_xL[i], 3)
+            self.assertAlmostEqual(gt_xR[i], out_interval_points_xR[i], 3)
+            self.assertEqual(gt_cost[i], out_cost[i])
+
+        self.assertAlmostEqual(1.0, opt.major_axis_intervals["cost"].sum(), 5)
+
+
+
+    # =========================================================================================
+    # UnitMapping()
+    def test_UnitMapping_EmptyIntervals(self):
+        opt = self.CreateOptimizer_Instance("test_table3.csv")
+        opt.UnitMapping()
+        self.assertTrue(len(opt.u_coords) == 0)
+
+
+    def test_UnitMapping_CorrectValues(self):
+        opt = self.CreateOptimizer_Instance("test_table2.csv")
+        self.assertTrue(opt.SelectIntervals())
+        self.assertTrue(opt.major_axis_intervals.shape[0] > 0)
+
+        opt.UnitMapping()
+        gt_u_coords = [
+            (0.0, 0.332),
+            (0.342, 0.658),
+            (0.668, 0.848),
+            (0.858, 1.03)]
+
+        self.assertTrue(len(gt_u_coords), len(opt.u_coords))
+
+        for i in range(len(gt_u_coords)):
+            self.assertAlmostEqual(gt_u_coords[i][0], opt.u_coords[i][0], 2)
+            self.assertAlmostEqual(gt_u_coords[i][1], opt.u_coords[i][1], 2)
+
+
+
+    # =========================================================================================
+    # UnmapValue()
+    def test_UnmapValue_CorrectValues(self):
+        opt = self.CreateOptimizer_Instance("test_table2.csv")
+
+        self.assertTrue(opt.SelectIntervals())
+        self.assertTrue(opt.major_axis_intervals.shape[0] > 0)
+
+        opt.UnitMapping()
+        self.assertTrue(len(opt.u_coords) > 0)
+
+        gt_values = [
+            (0.25, -6.4897),
+            (0.335, 5.54),
+            (0.56, 8.251),
+            (0.848, -0.5071),
+            (1.0, 3.801)
+        ]
+
+        for gv in gt_values:
+            unmapped_x = opt.UnmapValue(gv[0])
+            self.assertAlmostEqual(gv[1], unmapped_x, 3)
