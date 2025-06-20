@@ -110,7 +110,7 @@ class PlatoModule_MulDim:
 
 
     # Transforms unit-space value into region table's index (u -> i)
-    def UnmapX(self, region: pd.DataFrame, u_pick: float, u_coords: tuple) -> float:
+    def UnmapX(self, region: pd.DataFrame, u_pick: float, u_coords: tuple) -> np.array:
         alpha = (u_pick - u_coords[0]) / (u_coords[1] - u_coords[0])
         idx_range = region.index
         dims = len(self.optimizer.mins)

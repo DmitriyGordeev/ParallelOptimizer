@@ -1,9 +1,4 @@
 from unittest import TestCase
-import pandas as pd
-import numpy as np
-
-from MulDimOptimizer import MulDimOptimizer
-from PlatoModule_MulDim import PlatoModule_MulDim
 from test_helper import *
 
 
@@ -96,10 +91,66 @@ class TestPlatoModule_MulDim(TestCase):
         opt.plato_module.sum_shapes = region_1.shape[0] + region_2.shape[0] + region_3.shape[0]
         opt.plato_module.UnitMapRegions()
 
-        gt_ucoords = {0: (0.0, 0.16129), 1: (0.17129, 0.3325), 2: (0.3425, 1.02)}
+        gt_ucoords = {0: (0.0, 0.16129),
+                      1: (0.17129, 0.3325),
+                      2: (0.3425, 1.02)}
 
         for key, item in opt.plato_module.region_ucoords.items():
             self.assertAlmostEqual(gt_ucoords[key][0], item[0], 3)
             self.assertAlmostEqual(gt_ucoords[key][1], item[1], 3)
 
-        pass
+
+    # ================================================================================
+    # UnitMapRegions()
+    def test_UnmapX(self):
+        opt = CreateOptimizer_Instance("test_table6.csv")
+
+
+        # ---- region 1 ----
+        region_1 = pd.read_csv("plato_region_1.csv")
+        x = opt.plato_module.UnmapX(region_1, 0.0, (0.0, 1.0))
+        self.assertEqual(-2.5, x[0])
+        self.assertEqual(-2.5, x[1])
+
+        x = opt.plato_module.UnmapX(region_1, 1.0, (0.0, 1.0))
+        self.assertEqual(0.9, x[0])
+        self.assertEqual(0.9, x[1])
+
+
+        # ---- region 2 ----
+        region_2 = pd.read_csv("plato_region_2.csv")
+        x = opt.plato_module.UnmapX(region_2, 0.0, (0.0, 1.0))
+        self.assertAlmostEqual(2.5, x[0], 3)
+        self.assertAlmostEqual(2.5, x[1], 3)
+
+        x = opt.plato_module.UnmapX(region_2, 1.0, (0.0, 1.0))
+        self.assertAlmostEqual(3.0, x[0], 3)
+        self.assertAlmostEqual(3.0, x[1], 3)
+
+
+    # ================================================================================
+    # UnmapValues()
+    def test_UnmapValues(self):
+        opt = CreateOptimizer_Instance("test_table6.csv")
+        opt.SetupEps(block_eps=0.001, plato_x_eps=3.0, plato_y_eps=0.5, plato_block_eps=0.05)
+        opt.plato_module.plato_indexes = [(1, 2), (4, 6)]
+        opt.plato_module.GroupTables()
+        opt.plato_module.UnitMapRegions()
+
+        gt_x_plato_points = np.array([
+            [-2.5, 0.9, 2.5, 3.00005],
+            [-2.5, 0.9, 2.5, 3.0004999999999997]
+        ])
+
+        x_plato_points = opt.plato_module.UnmapValues()
+
+        self.assertEqual(gt_x_plato_points.shape, x_plato_points.shape)
+
+        for i in range(gt_x_plato_points.shape[0]):
+            for j in range(gt_x_plato_points.shape[1]):
+                gt_value = gt_x_plato_points[i, j]
+                out_value = x_plato_points[i, j]
+                self.assertAlmostEqual(gt_value, out_value, 3)
+
+
+
