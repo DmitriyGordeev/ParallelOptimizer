@@ -1,8 +1,8 @@
 from random import random
-from typing import Optional
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plot
 
 
 
@@ -30,11 +30,14 @@ class MulDimOptimizer:
         self.block_eps = 0.01
         self.plato_module = PlatoModule_MulDim(self)
 
-        # # Debug --------------
-        # self.debug_old_X = []
-        # self.debug_old_Y = []
-        # self.debug_new_X = []
-        # self.debug_new_Y = []
+        # Debug --------------
+        # old/new X - parameter matrix (columns = parameters x1, x2, ...)
+        self.debug_old_X = np.array([])
+        self.debug_new_X = []
+
+        # old/new Objective - 1D array
+        self.debug_old_Objective = np.array([])
+        self.debug_new_Objective = []
 
 
 
@@ -404,12 +407,15 @@ class MulDimOptimizer:
     """ x_matrix - rows = axes, columns = points """
     def RunValues(self, x_matrix: np.array):
         assert len(x_matrix) > 0
+        self.debug_new_X.clear()
+        self.debug_new_Objective.clear()
+
         for column in range(x_matrix.shape[1]):
             x_point = x_matrix[:, column]
 
             y = self.RunObjective(x_point)
-            # self.debug_new_X.append(x)
-            # self.debug_new_Y.append(y)
+            self.debug_new_X.append(x_point)
+            self.debug_new_Objective.append(y)
 
             result_dict = {
                 self.objective_column: y,
@@ -456,15 +462,15 @@ class MulDimOptimizer:
                         print(f"no plato detected, skip plato iteration")
                         continue
                     new_X = self.plato_module.GeneratePlatoPoints()
-                    # self.debug_old_X = self.known_values["X"].to_list()
-                    # self.debug_old_Y = self.known_values[self.objective_column].to_list()
+
+                    self.CacheDebugValues(True)
 
                     if len(new_X) == 0:
                         print("Plato run: new_X is empty array, skip this iteration")
                         continue
 
                     self.RunValues(new_X)
-                    # self.DebugPlot("plato")
+                    self.DebugPlot("plato")
 
                     self.plato_module.FindPlatoRegions()
                     self.plato_module.MarkPlatoRegions()
@@ -475,6 +481,7 @@ class MulDimOptimizer:
 
                 # Check if it is backward pass stage
                 is_forward = True
+                debug_name = "forward"
                 if backward_countdown == 0:
                     is_forward = False
                     debug_name = "backward"
@@ -491,9 +498,13 @@ class MulDimOptimizer:
                         continue
                     break
 
+                self.CacheDebugValues(True)
+
                 self.RunValues(x_matrix)
                 self.plato_module.FindPlatoRegions()
                 self.plato_module.MarkPlatoRegions()
+
+                self.DebugPlot(debug_name)
 
                 print(f"epoch = {self.epochs}, known_values.size = {self.known_values.shape[0]}")
 
@@ -502,6 +513,59 @@ class MulDimOptimizer:
         print(f"Total epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
               f"\ntop values: -------------------- \n")
         print(self.known_values.head(5))
+
+
+    def CacheDebugValues(self, old=False):
+        self.debug_old_X = self.known_values.iloc[:, :len(self.mins)].to_numpy()
+        self.debug_old_Objective = self.known_values[self.objective_column].to_numpy()
+
+        # if old:
+        #     self.debug_old_X = self.known_values.iloc[:, :len(self.mins)].to_numpy()
+        #     self.debug_old_Objective = self.known_values[self.objective_column].to_numpy()
+        # else:
+        #     self.debug_new_X = self.known_values.iloc[:, :len(self.mins)].to_numpy()
+        #     self.debug_new_Objective = self.known_values[self.objective_column].to_numpy()
+
+
+
+    """ works for 2D only z=f(x,y) """
+    def DebugPlot(self, run_name: str):
+        if len(self.mins) != 2:
+            return
+
+        x1 = self.debug_old_X[:, 0]
+        x2 = self.debug_old_X[:, 1]
+        plot.scatter(x1, x2, facecolors='none', edgecolors='g', marker='o', s=100)
+        plot.scatter(x1, x2, c=self.debug_old_Objective, cmap='Reds', marker='o')
+
+        plot.colorbar()
+
+        self.debug_new_X = np.array(self.debug_new_X)
+        x1 = self.debug_new_X[:, 0]
+        x2 = self.debug_new_X[:, 1]
+        plot.scatter(x1, x2, facecolors='none', edgecolors='k', marker='o', s=150)
+        plot.scatter(x1, x2, c=self.debug_new_Objective, cmap='Reds', marker='o')
+
+        plot.grid()
+        plot.savefig(f'plots/epoch_{self.epochs}_{run_name}.png', bbox_inches='tight')
+        plot.close()
+
+        self.debug_old_X = []
+        self.debug_old_Objective = []
+        self.debug_new_X = []
+        self.debug_new_Objective = []
+
+        pass
+        # plot.plot(self.debug_old_X, self.debug_old_Y, 'g.')
+        # plot.plot(self.debug_new_X, self.debug_new_Y, 'r.')
+        # plot.grid()
+        # plot.savefig(f'plots/epoch_{self.epochs}_{run_name}.png', bbox_inches='tight')
+        # plot.close()
+        #
+        # self.debug_old_X = []
+        # self.debug_old_Y = []
+        # self.debug_new_X = []
+        # self.debug_new_Y = []
 
 
 

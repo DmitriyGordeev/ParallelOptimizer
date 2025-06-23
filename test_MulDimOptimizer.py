@@ -306,3 +306,6 @@ class TestMulDimOptimizer(TestCase):
         for i in range(table.shape[0]):
             gt_sorted_value = table.iloc[i][major_column]
             self.assertAlmostEqual(gt_sorted_value, opt.known_values.iloc[i][major_column], 5)
+
+
+

@@ -1,6 +1,9 @@
 from unittest import TestCase
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plot
+from matplotlib import cm
+
 
 def func(x: float):
     # return 2.0 * x + 3.2
@@ -154,3 +157,32 @@ class TestMappingRange(TestCase):
             w = float(s) / sum_shapes
             plato_ucoords.append((u_cursor, u_cursor + w))
             u_cursor += w + u_gap
+
+
+
+    def test_frame_slicing(self):
+        x = np.arange(1, 11)
+        y = np.arange(1, 11)
+        weights = np.arange(1, 11)
+        plot.scatter(x, y, c=weights, cmap='Reds', marker='o')
+        plot.scatter(x, y, facecolors='none', edgecolors='k', marker='o', s=100)
+        plot.colorbar()
+        plot.grid()
+        plot.show()
+
+
+    # =========================================================================================
+    def test_DebugPlot(self):
+        data = pd.read_csv("test_table3.csv")
+        x1 = data["x1"].to_numpy()
+        x2 = data["x2"].to_numpy()
+        objective = data["Objective"].to_numpy()
+
+        plot.scatter(x1, x2, c=objective, cmap='Reds', marker='o')
+        plot.colorbar()
+        plot.scatter(x1, x2, facecolors='none', edgecolors='k', marker='o', s=100)
+
+        plot.grid()
+        plot.show()
+
+        pass
