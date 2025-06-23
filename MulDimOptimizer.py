@@ -519,13 +519,6 @@ class MulDimOptimizer:
         self.debug_old_X = self.known_values.iloc[:, :len(self.mins)].to_numpy()
         self.debug_old_Objective = self.known_values[self.objective_column].to_numpy()
 
-        # if old:
-        #     self.debug_old_X = self.known_values.iloc[:, :len(self.mins)].to_numpy()
-        #     self.debug_old_Objective = self.known_values[self.objective_column].to_numpy()
-        # else:
-        #     self.debug_new_X = self.known_values.iloc[:, :len(self.mins)].to_numpy()
-        #     self.debug_new_Objective = self.known_values[self.objective_column].to_numpy()
-
 
 
     """ works for 2D only z=f(x,y) """
@@ -554,19 +547,6 @@ class MulDimOptimizer:
         self.debug_old_Objective = []
         self.debug_new_X = []
         self.debug_new_Objective = []
-
-        pass
-        # plot.plot(self.debug_old_X, self.debug_old_Y, 'g.')
-        # plot.plot(self.debug_new_X, self.debug_new_Y, 'r.')
-        # plot.grid()
-        # plot.savefig(f'plots/epoch_{self.epochs}_{run_name}.png', bbox_inches='tight')
-        # plot.close()
-        #
-        # self.debug_old_X = []
-        # self.debug_old_Y = []
-        # self.debug_new_X = []
-        # self.debug_new_Y = []
-
 
 
 
