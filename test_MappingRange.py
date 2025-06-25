@@ -173,7 +173,7 @@ class TestMappingRange(TestCase):
 
     # =========================================================================================
     def test_DebugPlot(self):
-        data = pd.read_csv("test_table3.csv")
+        data = pd.read_csv("saved_tables/test_table3.csv")
         x1 = data["x1"].to_numpy()
         x2 = data["x2"].to_numpy()
         objective = data["Objective"].to_numpy()

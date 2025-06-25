@@ -8,6 +8,19 @@ from test_helper import *
 # TODO: добавить функцую, которая генерирует таблицы test_table*.csv (пишет в файл) в начале тестов setup/teardown ?
 class TestMulDimOptimizer(TestCase):
 
+
+    def setUp(self):
+        print("\nGenerating test tables")
+        GenerateTestTable1()
+        GenerateTestTable2()
+        GenerateTestTable3()
+        GenerateTestTable4()
+        GenerateTestTable5()
+        GenerateTestTable6()
+        GeneratePlatoRegion1()
+        GeneratePlatoRegion2()
+
+
     # ========================================================================================
     # CanSelectPoint()
     def test_CanSelectPoint_ReturnsTrue(self):
