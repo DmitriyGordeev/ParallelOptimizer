@@ -5,7 +5,6 @@ from test_helper import *
 
 # TODO: дать возможность указывать как запускать вектор переменных с именами в функцию через функтор
 
-# TODO: добавить функцую, которая генерирует таблицы test_table*.csv (пишет в файл) в начале тестов setup/teardown ?
 class TestMulDimOptimizer(TestCase):
 
 

@@ -1,4 +1,6 @@
+from concurrent.futures.thread import ThreadPoolExecutor
 from random import random
+from threading import Lock
 
 import pandas as pd
 import numpy as np
@@ -38,6 +40,10 @@ class MulDimOptimizer:
         # old/new Objective - 1D array
         self.debug_old_Objective = np.array([])
         self.debug_new_Objective = []
+
+        # synchronizattion
+        self.num_workers = 1
+        self.lock = Lock()
 
 
 
@@ -400,8 +406,38 @@ class MulDimOptimizer:
 
 
     def RunObjective(self, x):
-        self.internal_itr += 1
+        with self.lock:
+            self.internal_itr += 1
         return self.objective(x)
+
+
+
+    def RunWorker(self, x):
+        y = self.RunObjective(x)
+
+        with self.lock:
+            self.debug_new_X.append(x)
+            self.debug_new_Objective.append(y)
+
+        result_dict = {
+            self.objective_column: y,
+            "blocked": False,
+            "plato_block": False,
+            "plato_index": -1,
+            "plato_edge": False,
+        }
+
+        for i, name in enumerate(self.names):
+            result_dict[name] = x[i]
+
+        # TODO: переделать _append
+        with self.lock:
+            self.known_values = self.known_values._append(
+                result_dict,
+                ignore_index=True)
+
+
+
 
 
     """ x_matrix - rows = axes, columns = points """
@@ -410,25 +446,37 @@ class MulDimOptimizer:
         self.debug_new_X.clear()
         self.debug_new_Objective.clear()
 
-        for column in range(x_matrix.shape[1]):
-            x_point = x_matrix[:, column]
+        if self.num_workers < 2:
+            for column in range(x_matrix.shape[1]):
+                x_point = x_matrix[:, column]
+                self.RunWorker(x_point)
 
-            y = self.RunObjective(x_point)
-            self.debug_new_X.append(x_point)
-            self.debug_new_Objective.append(y)
+        else:
+            with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                for column in range(x_matrix.shape[1]):
+                    x_point = x_matrix[:, column]
+                    executor.submit(self.RunWorker, x_point)
 
-            result_dict = {
-                self.objective_column: y,
-                "blocked": False,
-                "plato_block": False,
-                "plato_index": -1,
-                "plato_edge": False,
-            }
 
-            for i, name in enumerate(self.names):
-                result_dict[name] = x_point[i]
-
-            self.known_values = self.known_values._append(result_dict, ignore_index=True)
+        # for column in range(x_matrix.shape[1]):
+        #     x_point = x_matrix[:, column]
+        #
+        #     y = self.RunObjective(x_point)
+        #     self.debug_new_X.append(x_point)
+        #     self.debug_new_Objective.append(y)
+        #
+        #     result_dict = {
+        #         self.objective_column: y,
+        #         "blocked": False,
+        #         "plato_block": False,
+        #         "plato_index": -1,
+        #         "plato_edge": False,
+        #     }
+        #
+        #     for i, name in enumerate(self.names):
+        #         result_dict[name] = x_point[i]
+        #
+        #     self.known_values = self.known_values._append(result_dict, ignore_index=True)
 
         # Переход на следующую major_axis
         self.major_axis += 1

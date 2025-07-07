@@ -6,7 +6,7 @@ from MulDimOptimizer import MulDimOptimizer
 
 
 def linear(x):
-    return x * 2 + 3.0
+    return x[0] * 2 + x[1] * 0.3 - 3.0
 
 
 def foo2D(x):
