@@ -437,9 +437,6 @@ class MulDimOptimizer:
                 ignore_index=True)
 
 
-
-
-
     """ x_matrix - rows = axes, columns = points """
     def RunValues(self, x_matrix: np.array):
         assert len(x_matrix) > 0
@@ -456,27 +453,6 @@ class MulDimOptimizer:
                 for column in range(x_matrix.shape[1]):
                     x_point = x_matrix[:, column]
                     executor.submit(self.RunWorker, x_point)
-
-
-        # for column in range(x_matrix.shape[1]):
-        #     x_point = x_matrix[:, column]
-        #
-        #     y = self.RunObjective(x_point)
-        #     self.debug_new_X.append(x_point)
-        #     self.debug_new_Objective.append(y)
-        #
-        #     result_dict = {
-        #         self.objective_column: y,
-        #         "blocked": False,
-        #         "plato_block": False,
-        #         "plato_index": -1,
-        #         "plato_edge": False,
-        #     }
-        #
-        #     for i, name in enumerate(self.names):
-        #         result_dict[name] = x_point[i]
-        #
-        #     self.known_values = self.known_values._append(result_dict, ignore_index=True)
 
         # Переход на следующую major_axis
         self.major_axis += 1
@@ -598,4 +574,5 @@ class MulDimOptimizer:
 
 
 
+# avoid circular imports
 from PlatoModule_MulDim import PlatoModule_MulDim
