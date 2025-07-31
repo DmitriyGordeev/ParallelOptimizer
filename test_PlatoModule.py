@@ -5,6 +5,16 @@ from test_helper import *
 
 class TestPlatoModule(TestCase):
 
+    def setUp(self):
+        print("\nGenerating test tables")
+        GenerateTestTable1()
+        GenerateTestTable2()
+        GenerateTestTable3()
+        GenerateTestTable4()
+        GenerateTestTable5()
+        GenerateTestTable6()
+        GeneratePlatoRegion1()
+        GeneratePlatoRegion2()
 
     # ================================================================================
     # FindPlatoRegions()
@@ -78,9 +88,9 @@ class TestPlatoModule(TestCase):
     def test_UnitMapRegions(self):
         opt = CreateOptimizer_Instance("test_table6.csv")
 
-        region_1 = pd.read_csv("saved_tables/test_table1.csv")
-        region_2 = pd.read_csv("saved_tables/test_table2.csv")
-        region_3 = pd.read_csv("saved_tables/test_table3.csv")
+        region_1 = pd.read_csv("test_table1.csv")
+        region_2 = pd.read_csv("test_table2.csv")
+        region_3 = pd.read_csv("test_table3.csv")
 
         opt.plato_module.plato_regions = [
             region_1,
@@ -107,7 +117,7 @@ class TestPlatoModule(TestCase):
 
 
         # ---- region 1 ----
-        region_1 = pd.read_csv("saved_tables/plato_region_1.csv")
+        region_1 = pd.read_csv("plato_region_1.csv")
         x = opt.plato_module.UnmapX(region_1, 0.0, (0.0, 1.0))
         self.assertEqual(-2.5, x[0])
         self.assertEqual(-2.5, x[1])
@@ -118,7 +128,7 @@ class TestPlatoModule(TestCase):
 
 
         # ---- region 2 ----
-        region_2 = pd.read_csv("saved_tables/plato_region_2.csv")
+        region_2 = pd.read_csv("plato_region_2.csv")
         x = opt.plato_module.UnmapX(region_2, 0.0, (0.0, 1.0))
         self.assertAlmostEqual(2.5, x[0], 3)
         self.assertAlmostEqual(2.5, x[1], 3)

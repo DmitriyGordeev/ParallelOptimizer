@@ -285,7 +285,7 @@ class TestParallelOptimizer(TestCase):
     # =========================================================================================
     # Warmup
     def test_Warmup_ShapeAndValues(self):
-        opt = ParallelOptimizer(linear)
+        opt = ParallelOptimizer(linear2D)
         opt.Init(names=["x1", "x2"], mins=[-10, -10], maxs=[10, 10])
         opt.Warmup()
 

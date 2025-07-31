@@ -5,7 +5,19 @@ import numpy as np
 from ParallelOptimizer import ParallelOptimizer
 
 
-def linear(x):
+def linear1D(x):
+    return x[0] * 2.3 + 0.98
+
+
+def gaussian1D(x):
+    # TODO: x[0] заменить на x и указать пользователю,
+    #  какой должна быть сигнатура функции
+    mu = 2.5
+    sig = 1.0
+    return 1.0 / (np.sqrt(2.0 * np.pi) * sig) * np.exp(-np.power((x[0] - mu) / sig, 2.0) / 2)
+
+
+def linear2D(x):
     return x[0] * 2 + x[1] * 0.3 - 3.0
 
 
@@ -37,7 +49,7 @@ def sombrero(x):
 
 def CreateOptimizer_Instance(table: str) -> ParallelOptimizer:
     data = pd.read_csv(table)
-    opt = ParallelOptimizer(linear)
+    opt = ParallelOptimizer(linear2D)
     opt.known_values = data
     opt.major_axis = 0
 
@@ -48,7 +60,7 @@ def CreateOptimizer_Instance(table: str) -> ParallelOptimizer:
 
 
 def CreateOptimizer_Sum() -> ParallelOptimizer:
-    opt = ParallelOptimizer(linear)
+    opt = ParallelOptimizer(linear2D)
     values = np.arange(-10, 11)
     opt.known_values["x1"] = values
     opt.known_values["x2"] = values
