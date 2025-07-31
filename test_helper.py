@@ -17,6 +17,10 @@ def const2D(x):
     return 0.0
 
 
+def const3D(x):
+    return 0.0
+
+
 def decay(x):
     x0 = x[0]
     x1 = x[1]

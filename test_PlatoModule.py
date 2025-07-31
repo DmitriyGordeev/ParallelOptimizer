@@ -3,7 +3,7 @@ from test_helper import *
 
 
 
-class TestPlatoModule_MulDim(TestCase):
+class TestPlatoModule(TestCase):
 
 
     # ================================================================================

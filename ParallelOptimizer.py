@@ -28,7 +28,7 @@ class ParallelOptimizer:
         self.major_axis = -1
 
         self.block_eps = 0.01
-        self.plato_module = PlatoModule_MulDim(self)
+        self.plato_module = PlatoModule(self)
 
         # Debug --------------
         # old/new X - parameter matrix (columns = parameters x1, x2, ...)
@@ -435,6 +435,7 @@ class ParallelOptimizer:
 
         # Переход на следующую major_axis
         self.major_axis += 1
+        print(f"Assigning new major axis = {self.major_axis}")
         if self.major_axis == len(self.mins):
             self.major_axis = 0
 
@@ -515,7 +516,7 @@ class ParallelOptimizer:
         print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ")
         print(f"Total epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
               f"\ntop values: -------------------- \n")
-        print(self.known_values.head(5))
+        print(self.known_values.head(5).to_string(index=False))
 
 
     def CacheDebugValues(self, old=False):
@@ -524,7 +525,7 @@ class ParallelOptimizer:
 
 
 
-    """ works for 2D only z=f(x,y) """
+    """ works for 2D only i.e. z=f(x,y) """
     def DebugPlot(self, run_name: str):
         if len(self.mins) != 2:
             return
@@ -553,4 +554,4 @@ class ParallelOptimizer:
 
 
 
-from PlatoModule_MulDim import PlatoModule_MulDim
+from PlatoModule import PlatoModule
