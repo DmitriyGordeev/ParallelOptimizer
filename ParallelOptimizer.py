@@ -1,4 +1,6 @@
+from concurrent.futures.thread import ThreadPoolExecutor
 from random import random
+from threading import Lock
 
 import pandas as pd
 import numpy as np
@@ -38,6 +40,10 @@ class ParallelOptimizer:
         # old/new Objective - 1D array
         self.debug_old_Objective = np.array([])
         self.debug_new_Objective = []
+
+        # synchronizattion
+        self.num_workers = 1
+        self.lock = Lock()
 
 
 
@@ -400,11 +406,38 @@ class ParallelOptimizer:
 
 
     def RunObjective(self, x):
-        self.internal_itr += 1
+        with self.lock:
+            self.internal_itr += 1
         result = self.objective(x)
         if not isinstance(result, float) and not isinstance(result, int):
             raise ValueError(f"objective function doesn't return int or float")
         return result
+
+
+
+    def RunWorker(self, x):
+        y = self.RunObjective(x)
+
+        with self.lock:
+            self.debug_new_X.append(x)
+            self.debug_new_Objective.append(y)
+
+        result_dict = {
+            self.objective_column: y,
+            "blocked": False,
+            "plato_block": False,
+            "plato_index": -1,
+            "plato_edge": False,
+        }
+
+        for i, name in enumerate(self.names):
+            result_dict[name] = x[i]
+
+        # TODO: переделать _append
+        with self.lock:
+            self.known_values = self.known_values._append(
+                result_dict,
+                ignore_index=True)
 
 
     """ x_matrix - rows = axes, columns = points """
@@ -413,29 +446,19 @@ class ParallelOptimizer:
         self.debug_new_X.clear()
         self.debug_new_Objective.clear()
 
-        for column in range(x_matrix.shape[1]):
-            x_point = x_matrix[:, column]
+        if self.num_workers < 2:
+            for column in range(x_matrix.shape[1]):
+                x_point = x_matrix[:, column]
+                self.RunWorker(x_point)
 
-            y = self.RunObjective(x_point)
-            self.debug_new_X.append(x_point)
-            self.debug_new_Objective.append(y)
-
-            result_dict = {
-                self.objective_column: y,
-                "blocked": False,
-                "plato_block": False,
-                "plato_index": -1,
-                "plato_edge": False,
-            }
-
-            for i, name in enumerate(self.names):
-                result_dict[name] = x_point[i]
-
-            self.known_values = self.known_values._append(result_dict, ignore_index=True)
+        else:
+            with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                for column in range(x_matrix.shape[1]):
+                    x_point = x_matrix[:, column]
+                    executor.submit(self.RunWorker, x_point)
 
         # Переход на следующую major_axis
         self.major_axis += 1
-        print(f"Assigning new major axis = {self.major_axis}")
         if self.major_axis == len(self.mins):
             self.major_axis = 0
 
@@ -516,7 +539,7 @@ class ParallelOptimizer:
         print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ")
         print(f"Total epochs = {self.epochs}, internal_iterations = {self.internal_itr}\n"
               f"\ntop values: -------------------- \n")
-        print(self.known_values.head(5).to_string(index=False))
+        print(self.known_values.head(5))
 
 
     def CacheDebugValues(self, old=False):
@@ -525,7 +548,7 @@ class ParallelOptimizer:
 
 
 
-    """ works for 2D only i.e. z=f(x,y) """
+    """ works for 2D only z=f(x,y) """
     def DebugPlot(self, run_name: str):
         if len(self.mins) != 2:
             return
@@ -554,4 +577,5 @@ class ParallelOptimizer:
 
 
 
+# avoid circular imports
 from PlatoModule import PlatoModule

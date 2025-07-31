@@ -5,8 +5,8 @@ import numpy as np
 from ParallelOptimizer import ParallelOptimizer
 
 
-def linear(x: list) -> float:
-    return x[0] * 2 + 3.0
+def linear(x):
+    return x[0] * 2 + x[1] * 0.3 - 3.0
 
 
 def foo2D(x):
@@ -14,10 +14,6 @@ def foo2D(x):
 
 
 def const2D(x):
-    return 0.0
-
-
-def const3D(x):
     return 0.0
 
 
@@ -74,3 +70,102 @@ def CreateOptimizer_Sum() -> ParallelOptimizer:
 
     opt.major_axis = 0
     return opt
+
+
+
+def GenerateTestTable1():
+    data = pd.DataFrame()
+    data["x1"] = [-10, -5, 0, 5, 10]
+    data["x2"] = [-10, -5, 0, 5, 10]
+    data["Objective"] = [0] * 5
+    data["blocked"] = [False] * 5
+    data["plato_block"] = [False] * 5
+    data["plato_index"] = [-1, -1, 0, 0, 0]
+    data["plato_edge"] = [False, False, True, False, True]
+    data.to_csv("test_table1.csv", index=False)
+
+
+def GenerateTestTable2():
+    data = pd.DataFrame()
+    data["x1"] = [-10, -5, 0, 5, 10]
+    data["x2"] = [-10, -5, 0, 5, 10]
+    data["Objective"] = [19.0, 18.0, -20.4, 16.0, 17.0]
+    data["blocked"] = [False] * 5
+    data["plato_block"] = [False] * 5
+    data["plato_index"] = [-1] * 5
+    data["plato_edge"] = [False] * 5
+    data.to_csv("test_table2.csv", index=False)
+
+
+def GenerateTestTable3():
+    data = pd.DataFrame()
+    data["x1"] = np.arange(-10.0, 11.0, 1.0)
+    data["x2"] = np.arange(-10.0, 11.0, 1.0)
+    data["Objective"] = data["x1"] + data["x2"]
+    data["blocked"] = [False] * 21
+    data["plato_block"] = [False] * 21
+    data["plato_index"] = [0] * 5 + [-1] * 16
+    data["plato_edge"] = [True] + [False] * 3 + [True] + [False] * 16
+    data.to_csv("test_table3.csv", index=False)
+
+
+def GenerateTestTable4():
+    data = pd.DataFrame()
+    data["x1"] = [-10.0, -5.0]
+    data["x2"] = [-10.0, -5.0]
+    data["Objective"] = [19.0, 18.0]
+    data["blocked"] = [False, False]
+    data["plato_block"] = [False, False]
+    data["plato_index"] = [-1, -1]
+    data["plato_edge"] = [False, False]
+    data.to_csv("test_table4.csv", index=False)
+
+
+def GenerateTestTable5():
+    data = pd.DataFrame()
+    data["x1"] = [-10.0, -5.0, 0.0, 1.8, 2.0, 3.0, 3.0001, 10.0]
+    data["x2"] = [-10.0, -5.0, 0.0, 1.8, 2.0, 3.0, 3.0001, 10.0]
+    data["Objective"] = [19.0, 18.0, -20.4, -20.8, -20.9, -20.9, -20.9, 17.0]
+    data["blocked"] = [False] * 8
+    data["plato_block"] = [False] * 8
+    data["plato_index"] = [-1] * 8
+    data["plato_edge"] = [False] * 8
+    data.to_csv("test_table5.csv", index=False)
+
+
+def GenerateTestTable6():
+    data = pd.DataFrame()
+    data["x1"] = [-10.0, -5.0, 0.0, 1.8, 2.0, 2.001, 3.0, 3.0001, 10.0]
+    data["x2"] = [-10.0, -5.0, 0.0, 1.8, 2.0, 2.001, 3.0, 3.0001, 10.0]
+    data["Objective"] = [19.0, 18.0, -20.4, -20.8, -20.9, -20.9, -20.9, -20.9, 17.0]
+    data["blocked"] = [False] * 9
+    data["plato_block"] = [False] * 5 + [True, False, False, False]
+    data["plato_index"] = [-1, 0, 0, 0, 1, 1, 1, 1, -1]
+    data["plato_edge"] = [False, True, False, True, True, False, False, True, False]
+    data.to_csv("test_table6.csv", index=False)
+
+
+def GeneratePlatoRegion1():
+    data = pd.DataFrame()
+    data["x1"] = [-5.0, 0.0, 1.8]
+    data["x2"] = [-5.0, 0.0, 1.8]
+    data["Objective"] = [18.0, -20.4, -20.8]
+    data["blocked"] = [False] * 3
+    data["plato_block"] = [False] * 3
+    data["plato_index"] = [0] * 3
+    data["plato_edge"] = [True, False, True]
+    data["original_index"] = [1, 2, 3]
+    data.to_csv("plato_region_1.csv", index=False)
+
+
+def GeneratePlatoRegion2():
+    data = pd.DataFrame()
+    data["x1"] = [2.0, 3.0, 3.0001]
+    data["x2"] = [2.0, 3.0, 3.0001]
+    data["Objective"] = [-20.9, -20.9, -20.9]
+    data["blocked"] = [False] * 3
+    data["plato_block"] = [False] * 3
+    data["plato_index"] = [1] * 3
+    data["plato_edge"] = [True, False, True]
+    data["original_index"] = [4, 6, 7]
+    data.to_csv("plato_region_2.csv", index=False)

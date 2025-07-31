@@ -1,23 +1,31 @@
 from unittest import TestCase
 from test_helper import *
 
+
 class TestOptimizer_FunctionalRuns(TestCase):
-    def test_functional_1D(self):
+
+    def test_functional_Linear(self):
         opt = ParallelOptimizer(linear)
-        opt.Init(names=["x"], mins=[-10], maxs=[10])
+        opt.n_probes = 10
+        opt.num_workers = 1
+        opt.Init(names=["x1", "x2"], mins=[-1, -1], maxs=[20, 20])
         opt.SetupEps(block_eps=0.01, plato_block_eps=0.05, plato_x_eps=4.0, plato_y_eps=0.1)
-        opt.RunCycle(10)
+        opt.RunCycle(20)
 
 
-    def test_functional_2D(self):
-        opt = ParallelOptimizer(decay)
-        opt.Init(names=["x1", "x2"], mins=[-10, -10], maxs=[10, 10])
+    def test_functional_Const(self):
+        opt = ParallelOptimizer(const2D)
+        opt.n_probes = 3
+        opt.num_workers = 1
+        opt.Init(names=["x1", "x2"], mins=[-1, -1], maxs=[20, 20])
         opt.SetupEps(block_eps=0.01, plato_block_eps=0.05, plato_x_eps=4.0, plato_y_eps=0.1)
-        opt.RunCycle(10)
+        opt.RunCycle(20)
 
 
-    def test_functional_3D(self):
-        opt = ParallelOptimizer(const3D)
-        opt.Init(names=["x1", "x2", "x3"], mins=[-10, -10, -10], maxs=[10, 10, 10])
+    def test_functional_Sombrero(self):
+        opt = ParallelOptimizer(sombrero)
+        opt.n_probes = 10
+        opt.num_workers = 5
+        opt.Init(names=["x1", "x2"], mins=[-20, -20], maxs=[20, 20])
         opt.SetupEps(block_eps=0.01, plato_block_eps=0.05, plato_x_eps=4.0, plato_y_eps=0.1)
-        opt.RunCycle(10)
+        opt.RunCycle(20)

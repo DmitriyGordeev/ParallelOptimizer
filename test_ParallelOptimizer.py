@@ -5,8 +5,20 @@ from test_helper import *
 
 # TODO: дать возможность указывать как запускать вектор переменных с именами в функцию через функтор
 
-# TODO: добавить функцую, которая генерирует таблицы test_table*.csv (пишет в файл) в начале тестов setup/teardown ?
 class TestParallelOptimizer(TestCase):
+
+
+    def setUp(self):
+        print("\nGenerating test tables")
+        GenerateTestTable1()
+        GenerateTestTable2()
+        GenerateTestTable3()
+        GenerateTestTable4()
+        GenerateTestTable5()
+        GenerateTestTable6()
+        GeneratePlatoRegion1()
+        GeneratePlatoRegion2()
+
 
     # ========================================================================================
     # CanSelectPoint()
