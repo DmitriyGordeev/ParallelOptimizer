@@ -6,7 +6,7 @@ from test_helper import *
 # TODO: дать возможность указывать как запускать вектор переменных с именами в функцию через функтор
 
 # TODO: добавить функцую, которая генерирует таблицы test_table*.csv (пишет в файл) в начале тестов setup/teardown ?
-class TestMulDimOptimizer(TestCase):
+class TestParallelOptimizer(TestCase):
 
     # ========================================================================================
     # CanSelectPoint()
@@ -273,7 +273,7 @@ class TestMulDimOptimizer(TestCase):
     # =========================================================================================
     # Warmup
     def test_Warmup_ShapeAndValues(self):
-        opt = MulDimOptimizer(linear)
+        opt = ParallelOptimizer(linear)
         opt.Init(names=["x1", "x2"], mins=[-10, -10], maxs=[10, 10])
         opt.Warmup()
 

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plot
 
 
 
-class MulDimOptimizer:
+class ParallelOptimizer:
     def __init__(self, objective: callable):
         self.known_values = pd.DataFrame()
         self.squeeze_factor = 0.8
@@ -401,7 +401,10 @@ class MulDimOptimizer:
 
     def RunObjective(self, x):
         self.internal_itr += 1
-        return self.objective(x)
+        result = self.objective(x)
+        if not isinstance(result, float) and not isinstance(result, int):
+            raise ValueError(f"objective function doesn't return int or float")
+        return result
 
 
     """ x_matrix - rows = axes, columns = points """

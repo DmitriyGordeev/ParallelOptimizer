@@ -2,11 +2,11 @@ import math
 import pandas as pd
 import numpy as np
 
-from MulDimOptimizer import MulDimOptimizer
+from ParallelOptimizer import ParallelOptimizer
 
 
-def linear(x):
-    return x * 2 + 3.0
+def linear(x: list) -> float:
+    return x[0] * 2 + 3.0
 
 
 def foo2D(x):
@@ -35,9 +35,9 @@ def sombrero(x):
 
 
 
-def CreateOptimizer_Instance(table: str) -> MulDimOptimizer:
+def CreateOptimizer_Instance(table: str) -> ParallelOptimizer:
     data = pd.read_csv(table)
-    opt = MulDimOptimizer(linear)
+    opt = ParallelOptimizer(linear)
     opt.known_values = data
     opt.major_axis = 0
 
@@ -47,8 +47,8 @@ def CreateOptimizer_Instance(table: str) -> MulDimOptimizer:
     return opt
 
 
-def CreateOptimizer_Sum() -> MulDimOptimizer:
-    opt = MulDimOptimizer(linear)
+def CreateOptimizer_Sum() -> ParallelOptimizer:
+    opt = ParallelOptimizer(linear)
     values = np.arange(-10, 11)
     opt.known_values["x1"] = values
     opt.known_values["x2"] = values

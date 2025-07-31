@@ -1,10 +1,10 @@
-from MulDimOptimizer import MulDimOptimizer
+from ParallelOptimizer import ParallelOptimizer
 import numpy as np
 import pandas as pd
 
 
 class PlatoModule_MulDim:
-    def __init__(self, optimizer: MulDimOptimizer):
+    def __init__(self, optimizer: ParallelOptimizer):
         self.optimizer = optimizer
         self.plato_indexes = []
         self.plato_regions = []
